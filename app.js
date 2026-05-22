@@ -752,20 +752,35 @@ async function loadSubscriptions() {
 async function loadHealthScore() {
   const res = await apiFetch('/api/score');
   const data = await res.json();
-  document.getElementById('scoreNumber').textContent = data.score;
-  document.getElementById('scoreGrade').textContent = data.grade;
+  const card = document.getElementById('scoreCard');
   const gradeColors = { A: '#22c55e', B: '#84cc16', C: '#f59e0b', D: '#f97316', F: '#ef4444' };
-  document.getElementById('scoreGrade').style.color = gradeColors[data.grade] || '#9ca3af';
 
-  const bars = Object.values(data.components);
-  document.getElementById('scoreBars').innerHTML = bars.map(c => {
-    const pct = (c.score / c.max) * 100;
-    return `<div class="score-bar-row">
-      <div class="score-bar-label">${c.label}</div>
-      <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct.toFixed(0)}%"></div></div>
-      <div class="score-bar-pts">${c.score}/${c.max}</div>
+  if (!data.ready) {
+    card.innerHTML = `<div class="score-unlock">
+      <div class="score-unlock-icon">📊</div>
+      <div class="score-unlock-title">Your score is building</div>
+      <div class="score-unlock-body">Log your income and expenses this month to unlock your financial health score.</div>
+      <button class="score-unlock-btn" onclick="switchTab('transactions')">Add your first transaction</button>
     </div>`;
-  }).join('');
+    return;
+  }
+
+  card.innerHTML = `
+    <div class="score-left">
+      <div class="score-number">${data.score}</div>
+      <div class="score-label">Financial health</div>
+    </div>
+    <div class="score-grade" style="color:${gradeColors[data.grade] || '#9ca3af'}">${data.grade}</div>
+    <div class="score-bars">
+      ${Object.values(data.components).map(c => {
+        const pct = (c.score / c.max) * 100;
+        return `<div class="score-bar-row">
+          <div class="score-bar-label">${c.label}</div>
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct.toFixed(0)}%"></div></div>
+          <div class="score-bar-pts">${c.score}/${c.max}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
 }
 
 // ── Cash flow forecast ──

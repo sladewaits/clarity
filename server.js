@@ -981,6 +981,7 @@ app.get('/api/score', requireAuth, async (req, res) => {
 
   res.json({
     score: total, grade,
+    ready: thisMonth.length > 0,
     components: {
       savings: { score: savingsScore, max: 25, label: 'Savings rate' },
       budget: { score: budgetScore, max: 25, label: 'Budget discipline' },
