@@ -10,12 +10,22 @@ const app = express();
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'clarity-secret-change-in-prod';
-const USERS_FILE = process.env.DATA_DIR
-  ? path.join(process.env.DATA_DIR, 'users.json')
-  : path.join(__dirname, 'users.json');
 
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// ── Storage layer ──
+const USE_DB = !!process.env.DATABASE_URL;
+let pool;
+
+if (USE_DB) {
+  const { Pool } = require('pg');
+  pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+}
+
+const USERS_FILE = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'users.json')
+  : path.join(__dirname, 'users.json');
 
 function userDataFile(userId) {
   const base = process.env.DATA_DIR || __dirname;
@@ -24,45 +34,148 @@ function userDataFile(userId) {
   return path.join(dir, 'data.json');
 }
 
-function load(userId) {
-  const DATA_FILE = userDataFile(userId);
-  const defaults = {
+function mkDefaults() {
+  return {
     transactions: [], budgets: [], goals: [], messages: [],
     paydaySchedule: null, recurring: [], subscriptions: [],
     assets: [], liabilities: [], currentBalance: null,
     creditScores: [], challenges: {}, shared: [], milestones: [],
     freedomTarget: null,
   };
-  if (!fs.existsSync(DATA_FILE)) return defaults;
-  try {
-    const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return {
-      ...defaults, ...d,
-      recurring: d.recurring || [],
-      subscriptions: d.subscriptions || [],
-      assets: d.assets || [],
-      liabilities: d.liabilities || [],
-      currentBalance: d.currentBalance ?? null,
-      creditScores: d.creditScores || [],
-      challenges: d.challenges || {},
-      shared: d.shared || [],
-      milestones: d.milestones || [],
-      freedomTarget: d.freedomTarget ?? null,
-    };
-  } catch { return defaults; }
 }
 
-function save(data, userId) {
-  fs.writeFileSync(userDataFile(userId), JSON.stringify(data, null, 2));
+function mergeDefaults(d) {
+  return {
+    ...mkDefaults(), ...d,
+    recurring: d.recurring || [],
+    subscriptions: d.subscriptions || [],
+    assets: d.assets || [],
+    liabilities: d.liabilities || [],
+    currentBalance: d.currentBalance ?? null,
+    creditScores: d.creditScores || [],
+    challenges: d.challenges || {},
+    shared: d.shared || [],
+    milestones: d.milestones || [],
+    freedomTarget: d.freedomTarget ?? null,
+  };
 }
 
-function loadUsers() {
+async function initDB() {
+  if (!USE_DB) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      avatar TEXT DEFAULT '😊',
+      target_savings_rate NUMERIC DEFAULT 20,
+      monthly_income_goal NUMERIC DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS user_data (
+      user_id TEXT PRIMARY KEY,
+      data JSONB NOT NULL DEFAULT '{}'
+    );
+  `);
+}
+
+async function load(userId) {
+  if (USE_DB) {
+    try {
+      const result = await pool.query('SELECT data FROM user_data WHERE user_id = $1', [userId]);
+      if (!result.rows.length) return mkDefaults();
+      return mergeDefaults(result.rows[0].data);
+    } catch { return mkDefaults(); }
+  }
+  const DATA_FILE = userDataFile(userId);
+  if (!fs.existsSync(DATA_FILE)) return mkDefaults();
+  try { return mergeDefaults(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))); }
+  catch { return mkDefaults(); }
+}
+
+async function save(data, userId) {
+  if (USE_DB) {
+    await pool.query(
+      'INSERT INTO user_data (user_id, data) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET data = $2',
+      [userId, JSON.stringify(data)]
+    );
+  } else {
+    fs.writeFileSync(userDataFile(userId), JSON.stringify(data, null, 2));
+  }
+}
+
+function rowToUser(r) {
+  return {
+    id: r.id, email: r.email, name: r.name,
+    passwordHash: r.password_hash, avatar: r.avatar,
+    targetSavingsRate: parseFloat(r.target_savings_rate),
+    monthlyIncomeGoal: parseFloat(r.monthly_income_goal),
+    createdAt: r.created_at,
+  };
+}
+
+function loadUsersFile() {
   if (!fs.existsSync(USERS_FILE)) return [];
   try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); } catch { return []; }
 }
 
-function saveUsers(users) {
+function saveUsersFile(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+async function getUserByEmail(email) {
+  if (USE_DB) {
+    const r = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    return r.rows.length ? rowToUser(r.rows[0]) : null;
+  }
+  return loadUsersFile().find(u => u.email === email) || null;
+}
+
+async function getUserById(id) {
+  if (USE_DB) {
+    const r = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    return r.rows.length ? rowToUser(r.rows[0]) : null;
+  }
+  return loadUsersFile().find(u => u.id === id) || null;
+}
+
+async function createUser(user) {
+  if (USE_DB) {
+    await pool.query(
+      'INSERT INTO users (id, email, name, password_hash, avatar, target_savings_rate, monthly_income_goal, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [user.id, user.email, user.name, user.passwordHash, user.avatar, user.targetSavingsRate, user.monthlyIncomeGoal, user.createdAt]
+    );
+  } else {
+    const users = loadUsersFile();
+    users.push(user);
+    saveUsersFile(users);
+  }
+}
+
+async function updateUser(userId, updates) {
+  if (USE_DB) {
+    const fields = [], values = [];
+    let i = 1;
+    if (updates.name !== undefined) { fields.push(`name = $${i++}`); values.push(updates.name); }
+    if (updates.avatar !== undefined) { fields.push(`avatar = $${i++}`); values.push(updates.avatar); }
+    if (updates.targetSavingsRate !== undefined) { fields.push(`target_savings_rate = $${i++}`); values.push(updates.targetSavingsRate); }
+    if (updates.monthlyIncomeGoal !== undefined) { fields.push(`monthly_income_goal = $${i++}`); values.push(updates.monthlyIncomeGoal); }
+    if (!fields.length) return getUserById(userId);
+    values.push(userId);
+    await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = $${i}`, values);
+    return getUserById(userId);
+  } else {
+    const users = loadUsersFile();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx < 0) return null;
+    if (updates.name !== undefined) users[idx].name = updates.name;
+    if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
+    if (updates.targetSavingsRate !== undefined) users[idx].targetSavingsRate = parseFloat(updates.targetSavingsRate) || 20;
+    if (updates.monthlyIncomeGoal !== undefined) users[idx].monthlyIncomeGoal = parseFloat(updates.monthlyIncomeGoal) || 0;
+    saveUsersFile(users);
+    return users[idx];
+  }
 }
 
 function requireAuth(req, res, next) {
@@ -78,7 +191,6 @@ function requireAuth(req, res, next) {
   }
 }
 
-// Advance a recurring item's nextDate by its frequency
 function advanceNextDate(rec) {
   const d = new Date(rec.nextDate + 'T00:00:00');
   if (rec.frequency === 'weekly') d.setDate(d.getDate() + 7);
@@ -88,13 +200,11 @@ function advanceNextDate(rec) {
   rec.nextDate = d.toISOString().split('T')[0];
 }
 
-// Items due on or before today
 function getDueRecurring(data) {
   const today = new Date().toISOString().split('T')[0];
   return data.recurring.filter(r => r.nextDate <= today);
 }
 
-// Returns day-of-month numbers that are paydays for a given year/month
 function getPaydaysForMonth(schedule, year, month) {
   if (!schedule || !schedule.type) return [];
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -114,16 +224,10 @@ function getPaydaysForMonth(schedule, year, month) {
     const last = new Date(year, month, daysInMonth);
     let cur = new Date(start);
     while (cur < first) cur.setDate(cur.getDate() + 14);
-    while (cur <= last) {
-      days.add(cur.getDate());
-      cur.setDate(cur.getDate() + 14);
-    }
+    while (cur <= last) { days.add(cur.getDate()); cur.setDate(cur.getDate() + 14); }
     cur = new Date(start);
     while (cur > first) cur.setDate(cur.getDate() - 14);
-    while (cur <= last) {
-      if (cur >= first) days.add(cur.getDate());
-      cur.setDate(cur.getDate() + 14);
-    }
+    while (cur <= last) { if (cur >= first) days.add(cur.getDate()); cur.setDate(cur.getDate() + 14); }
   } else if (schedule.type === 'weekly') {
     if (!schedule.startDate) return [];
     const start = new Date(schedule.startDate + 'T00:00:00');
@@ -306,22 +410,19 @@ app.post('/auth/register', async (req, res) => {
   if (!email || !password || !name) return res.status(400).json({ error: 'All fields required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-  const users = loadUsers();
-  if (users.find(u => u.email === email)) return res.status(400).json({ error: 'Email already registered' });
+  const existing = await getUserByEmail(email);
+  if (existing) return res.status(400).json({ error: 'Email already registered' });
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = {
     id: Date.now().toString(),
-    email,
-    name,
-    passwordHash,
+    email, name, passwordHash,
     avatar: '😊',
     targetSavingsRate: 20,
     monthlyIncomeGoal: 0,
     createdAt: new Date().toISOString(),
   };
-  users.push(user);
-  saveUsers(users);
+  await createUser(user);
 
   const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '90d' });
   res.json({
@@ -334,8 +435,7 @@ app.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-  const users = loadUsers();
-  const user = users.find(u => u.email === email);
+  const user = await getUserByEmail(email);
   if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
@@ -348,32 +448,28 @@ app.post('/auth/login', async (req, res) => {
   });
 });
 
-app.get('/auth/me', requireAuth, (req, res) => {
-  const users = loadUsers();
-  const user = users.find(u => u.id === req.userId);
+app.get('/auth/me', requireAuth, async (req, res) => {
+  const user = await getUserById(req.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ id: user.id, email: user.email, name: user.name, avatar: user.avatar, targetSavingsRate: user.targetSavingsRate, monthlyIncomeGoal: user.monthlyIncomeGoal });
 });
 
-app.put('/auth/profile', requireAuth, (req, res) => {
+app.put('/auth/profile', requireAuth, async (req, res) => {
   const { name, avatar, targetSavingsRate, monthlyIncomeGoal } = req.body;
-  const users = loadUsers();
-  const idx = users.findIndex(u => u.id === req.userId);
-  if (idx < 0) return res.status(404).json({ error: 'User not found' });
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (avatar !== undefined) updates.avatar = avatar;
+  if (targetSavingsRate !== undefined) updates.targetSavingsRate = parseFloat(targetSavingsRate) || 20;
+  if (monthlyIncomeGoal !== undefined) updates.monthlyIncomeGoal = parseFloat(monthlyIncomeGoal) || 0;
 
-  if (name !== undefined) users[idx].name = name;
-  if (avatar !== undefined) users[idx].avatar = avatar;
-  if (targetSavingsRate !== undefined) users[idx].targetSavingsRate = parseFloat(targetSavingsRate) || 20;
-  if (monthlyIncomeGoal !== undefined) users[idx].monthlyIncomeGoal = parseFloat(monthlyIncomeGoal) || 0;
-
-  saveUsers(users);
-  const u = users[idx];
+  const u = await updateUser(req.userId, updates);
+  if (!u) return res.status(404).json({ error: 'User not found' });
   res.json({ id: u.id, email: u.email, name: u.name, avatar: u.avatar, targetSavingsRate: u.targetSavingsRate, monthlyIncomeGoal: u.monthlyIncomeGoal });
 });
 
 // Transactions
-app.get('/api/transactions', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/transactions', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   let txs = data.transactions.slice().reverse();
   if (req.query.month) {
     const { year, month } = parseMonth(req.query.month);
@@ -385,96 +481,91 @@ app.get('/api/transactions', requireAuth, (req, res) => {
   res.json(txs);
 });
 
-app.post('/api/transactions', requireAuth, (req, res) => {
+app.post('/api/transactions', requireAuth, async (req, res) => {
   const { type, amount, category, description, recurring } = req.body;
   if (!type || !amount || !category) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const tx = {
     id: Date.now().toString(),
-    type,
-    amount: parseFloat(amount),
-    category,
+    type, amount: parseFloat(amount), category,
     description: description || '',
     recurring: !!recurring,
     date: new Date().toISOString(),
   };
   data.transactions.push(tx);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(tx);
 });
 
-app.delete('/api/transactions/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/transactions/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.transactions = data.transactions.filter(t => t.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Budgets
-app.get('/api/budgets', requireAuth, (req, res) => {
-  res.json(load(req.userId).budgets);
+app.get('/api/budgets', requireAuth, async (req, res) => {
+  res.json((await load(req.userId)).budgets);
 });
 
-app.post('/api/budgets', requireAuth, (req, res) => {
+app.post('/api/budgets', requireAuth, async (req, res) => {
   const { category, limit } = req.body;
   if (!category || !limit) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const existing = data.budgets.findIndex(b => b.category === category);
-  if (existing >= 0) {
-    data.budgets[existing].limit = parseFloat(limit);
-  } else {
-    data.budgets.push({ category, limit: parseFloat(limit) });
-  }
-  save(data, req.userId);
+  if (existing >= 0) data.budgets[existing].limit = parseFloat(limit);
+  else data.budgets.push({ category, limit: parseFloat(limit) });
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
-app.delete('/api/budgets/:category', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/budgets/:category', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.budgets = data.budgets.filter(b => b.category !== decodeURIComponent(req.params.category));
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Goals
-app.get('/api/goals', requireAuth, (req, res) => {
-  res.json(load(req.userId).goals);
+app.get('/api/goals', requireAuth, async (req, res) => {
+  res.json((await load(req.userId)).goals);
 });
 
-app.post('/api/goals', requireAuth, (req, res) => {
+app.post('/api/goals', requireAuth, async (req, res) => {
   const { name, target } = req.body;
   if (!name || !target) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const goal = { id: Date.now().toString(), name, target: parseFloat(target), current: 0, deposits: [] };
   data.goals.push(goal);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(goal);
 });
 
-app.post('/api/goals/:id/deposit', requireAuth, (req, res) => {
+app.post('/api/goals/:id/deposit', requireAuth, async (req, res) => {
   const { amount } = req.body;
   if (!amount) return res.status(400).json({ error: 'Missing amount' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const goal = data.goals.find(g => g.id === req.params.id);
   if (!goal) return res.status(404).json({ error: 'Not found' });
   const deposit = parseFloat(amount);
   goal.current = Math.min(goal.current + deposit, goal.target);
   if (!goal.deposits) goal.deposits = [];
   goal.deposits.push({ amount: deposit, date: new Date().toISOString() });
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(goal);
 });
 
-app.delete('/api/goals/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/goals/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.goals = data.goals.filter(g => g.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Months with data
-app.get('/api/months', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/months', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const months = new Set();
   data.transactions.forEach(t => {
     const d = new Date(t.date);
@@ -486,8 +577,8 @@ app.get('/api/months', requireAuth, (req, res) => {
 });
 
 // Overview stats
-app.get('/api/overview', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/overview', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const { year, month } = parseMonth(req.query.month);
 
   const thisMonth = filterByMonth(data.transactions, year, month);
@@ -506,22 +597,15 @@ app.get('/api/overview', requireAuth, (req, res) => {
   });
 
   const budgetStatus = data.budgets.map(b => ({
-    category: b.category,
-    limit: b.limit,
-    spent: byCategory[b.category] || 0,
+    category: b.category, limit: b.limit, spent: byCategory[b.category] || 0,
   }));
 
-  res.json({
-    income, expenses, net: income - expenses,
-    lastIncome, lastExpenses,
-    budgetStatus, goals: data.goals,
-    byCategory,
-  });
+  res.json({ income, expenses, net: income - expenses, lastIncome, lastExpenses, budgetStatus, goals: data.goals, byCategory });
 });
 
 // AI Insights
 app.post('/api/insights', requireAuth, async (req, res) => {
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const system = buildSystem(data, req.body.month);
   try {
     const msg = await client.messages.create({
@@ -537,32 +621,22 @@ app.post('/api/insights', requireAuth, async (req, res) => {
 });
 
 // CSV Export — accepts token via query param as alternative to header
-app.get('/api/export', (req, res) => {
-  // Try Authorization header first, then query token
+app.get('/api/export', async (req, res) => {
   let userId = null;
   const header = req.headers.authorization;
   if (header && header.startsWith('Bearer ')) {
-    try {
-      const payload = jwt.verify(header.slice(7), JWT_SECRET);
-      userId = payload.userId;
-    } catch {}
+    try { const payload = jwt.verify(header.slice(7), JWT_SECRET); userId = payload.userId; } catch {}
   }
   if (!userId && req.query.token) {
-    try {
-      const payload = jwt.verify(req.query.token, JWT_SECRET);
-      userId = payload.userId;
-    } catch {}
+    try { const payload = jwt.verify(req.query.token, JWT_SECRET); userId = payload.userId; } catch {}
   }
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const data = load(userId);
+  const data = await load(userId);
   let txs = data.transactions;
   if (req.query.month) {
     const { year, month } = parseMonth(req.query.month);
-    txs = txs.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() === month && d.getFullYear() === year;
-    });
+    txs = txs.filter(t => { const d = new Date(t.date); return d.getMonth() === month && d.getFullYear() === year; });
   }
   const rows = ['Date,Type,Category,Description,Amount'];
   txs.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(t => {
@@ -582,7 +656,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
   const { message, month } = req.body;
   if (!message) return res.status(400).json({ error: 'No message' });
 
-  const data = load(req.userId);
+  const data = await load(req.userId);
   data.messages.push({ role: 'user', content: message });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -623,7 +697,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 
     const cleanFull = stripMarkdown(full);
     data.messages.push({ role: 'assistant', content: cleanFull });
-    save(data, req.userId);
+    await save(data, req.userId);
     send({ type: 'done' });
     res.end();
   } catch (err) {
@@ -634,15 +708,15 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 });
 
 // ── Recurring transactions ──
-app.get('/api/recurring', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/recurring', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   res.json({ recurring: data.recurring, due: getDueRecurring(data) });
 });
 
-app.post('/api/recurring', requireAuth, (req, res) => {
+app.post('/api/recurring', requireAuth, async (req, res) => {
   const { type, amount, category, description, frequency, startDate } = req.body;
   if (!type || !amount || !category || !frequency) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const item = {
     id: Date.now().toString(),
     type, amount: parseFloat(amount), category,
@@ -650,25 +724,21 @@ app.post('/api/recurring', requireAuth, (req, res) => {
     nextDate: startDate || new Date().toISOString().split('T')[0],
   };
   data.recurring.push(item);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(item);
 });
 
-app.delete('/api/recurring/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/recurring/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.recurring = data.recurring.filter(r => r.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
-// Log all due recurring items as real transactions
-app.post('/api/recurring/log', requireAuth, (req, res) => {
+app.post('/api/recurring/log', requireAuth, async (req, res) => {
   const { ids } = req.body;
-  const data = load(req.userId);
-  const today = new Date().toISOString().split('T')[0];
-  const toLog = ids
-    ? data.recurring.filter(r => ids.includes(r.id))
-    : getDueRecurring(data);
+  const data = await load(req.userId);
+  const toLog = ids ? data.recurring.filter(r => ids.includes(r.id)) : getDueRecurring(data);
 
   const logged = [];
   toLog.forEach(rec => {
@@ -682,13 +752,13 @@ app.post('/api/recurring/log', requireAuth, (req, res) => {
     logged.push(tx);
     advanceNextDate(rec);
   });
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ logged, due: getDueRecurring(data) });
 });
 
 // ── Monthly trends (last 6 months) ──
-app.get('/api/trends', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/trends', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const months = [];
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
@@ -710,25 +780,21 @@ app.get('/api/trends', requireAuth, (req, res) => {
   res.json(months);
 });
 
-// ── Upcoming bills (recurring expenses in next 14 days) ──
-app.get('/api/upcoming', requireAuth, (req, res) => {
-  const data = load(req.userId);
+// ── Upcoming bills ──
+app.get('/api/upcoming', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 14);
   const upcoming = data.recurring
     .filter(r => r.type === 'expense')
-    .map(r => ({ ...r, nextDate: r.nextDate }))
-    .filter(r => {
-      const d = new Date(r.nextDate + 'T00:00:00');
-      return d >= today && d <= cutoff;
-    })
+    .filter(r => { const d = new Date(r.nextDate + 'T00:00:00'); return d >= today && d <= cutoff; })
     .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
   res.json(upcoming);
 });
 
 // ── Budget alerts ──
-app.get('/api/alerts', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/alerts', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const now = new Date();
   const txs = data.transactions.filter(t => {
     const d = new Date(t.date);
@@ -774,8 +840,8 @@ app.post('/api/analyze-check', requireAuth, async (req, res) => {
 });
 
 // ── Subscriptions ──
-app.get('/api/subscriptions', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/subscriptions', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const subs = data.subscriptions;
   const monthlyTotal = subs
     .filter(s => s.active !== false)
@@ -783,83 +849,82 @@ app.get('/api/subscriptions', requireAuth, (req, res) => {
   res.json({ subscriptions: subs, monthlyTotal });
 });
 
-app.post('/api/subscriptions', requireAuth, (req, res) => {
+app.post('/api/subscriptions', requireAuth, async (req, res) => {
   const { name, amount, cycle, nextBilling, category } = req.body;
   if (!name || !amount) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const sub = {
-    id: Date.now().toString(),
-    name, amount: parseFloat(amount),
+    id: Date.now().toString(), name, amount: parseFloat(amount),
     cycle: cycle || 'monthly',
     nextBilling: nextBilling || new Date().toISOString().split('T')[0],
     category: category || 'Subscriptions',
     active: true,
   };
   data.subscriptions.push(sub);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(sub);
 });
 
-app.delete('/api/subscriptions/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/subscriptions/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.subscriptions = data.subscriptions.filter(s => s.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
-app.post('/api/subscriptions/:id/cancel', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.post('/api/subscriptions/:id/cancel', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const sub = data.subscriptions.find(s => s.id === req.params.id);
   if (sub) sub.active = false;
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 // ── Net worth ──
-app.get('/api/networth', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/networth', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const totalAssets = data.assets.reduce((s, a) => s + a.value, 0);
   const totalLiabilities = data.liabilities.reduce((s, l) => s + l.balance, 0);
   res.json({ assets: data.assets, liabilities: data.liabilities, totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities });
 });
 
-app.post('/api/assets', requireAuth, (req, res) => {
+app.post('/api/assets', requireAuth, async (req, res) => {
   const { name, type, value } = req.body;
   if (!name || !value) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const asset = { id: Date.now().toString(), name, type: type || 'liquid', value: parseFloat(value) };
   data.assets.push(asset);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(asset);
 });
 
-app.delete('/api/assets/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/assets/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.assets = data.assets.filter(a => a.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
-app.post('/api/liabilities', requireAuth, (req, res) => {
+app.post('/api/liabilities', requireAuth, async (req, res) => {
   const { name, balance, interestRate, minPayment } = req.body;
   if (!name || !balance) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const liability = { id: Date.now().toString(), name, balance: parseFloat(balance), interestRate: parseFloat(interestRate) || 0, minPayment: parseFloat(minPayment) || 0 };
   data.liabilities.push(liability);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(liability);
 });
 
-app.delete('/api/liabilities/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/liabilities/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.liabilities = data.liabilities.filter(l => l.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 // ── Financial health score ──
-app.get('/api/score', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/score', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const now = new Date();
   const thisMonth = data.transactions.filter(t => {
     const d = new Date(t.date);
@@ -882,8 +947,7 @@ app.get('/api/score', requireAuth, (req, res) => {
     const byCategory = {};
     thisMonth.filter(t => t.type === 'expense').forEach(t => { byCategory[t.category] = (byCategory[t.category] || 0) + t.amount; });
     const overCount = data.budgets.filter(b => (byCategory[b.category] || 0) > b.limit).length;
-    const ratio = 1 - overCount / data.budgets.length;
-    budgetScore = Math.round(ratio * 25);
+    budgetScore = Math.round((1 - overCount / data.budgets.length) * 25);
   }
 
   const subTotal = data.subscriptions.filter(s => s.active !== false).reduce((s, sub) => s + (sub.cycle === 'yearly' ? sub.amount / 12 : sub.amount), 0);
@@ -900,7 +964,6 @@ app.get('/api/score', requireAuth, (req, res) => {
     const avgPct = data.goals.reduce((s, g) => s + Math.min(g.current / g.target, 1), 0) / data.goals.length;
     if (avgPct >= 0.5) goalScore = 15;
     else if (avgPct >= 0.25) goalScore = 10;
-    else goalScore = 5;
   }
 
   const txCount = thisMonth.length;
@@ -929,8 +992,8 @@ app.get('/api/score', requireAuth, (req, res) => {
 });
 
 // ── Cash flow forecast ──
-app.get('/api/forecast', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/forecast', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let balance = data.currentBalance ?? 0;
 
@@ -958,17 +1021,17 @@ app.get('/api/forecast', requireAuth, (req, res) => {
   res.json({ currentBalance: balance, events: events.slice(0, 20), checkpoints });
 });
 
-app.post('/api/forecast/balance', requireAuth, (req, res) => {
+app.post('/api/forecast/balance', requireAuth, async (req, res) => {
   const { balance } = req.body;
-  const data = load(req.userId);
+  const data = await load(req.userId);
   data.currentBalance = parseFloat(balance) || 0;
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ currentBalance: data.currentBalance });
 });
 
 // Paydays
-app.get('/api/paydays', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/paydays', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const schedule = data.paydaySchedule;
   const { year, month } = parseMonth(req.query.month);
   const days = getPaydaysForMonth(schedule, year, month);
@@ -976,27 +1039,27 @@ app.get('/api/paydays', requireAuth, (req, res) => {
   res.json({ schedule, days, next });
 });
 
-app.post('/api/paydays', requireAuth, (req, res) => {
+app.post('/api/paydays', requireAuth, async (req, res) => {
   const { schedule } = req.body;
-  const data = load(req.userId);
+  const data = await load(req.userId);
   data.paydaySchedule = schedule;
-  save(data, req.userId);
+  await save(data, req.userId);
   const { year, month } = parseMonth(req.query.month);
   const days = getPaydaysForMonth(schedule, year, month);
   const next = getNextPayday(schedule);
   res.json({ schedule, days, next });
 });
 
-app.post('/api/paydays/toggle', requireAuth, (req, res) => {
+app.post('/api/paydays/toggle', requireAuth, async (req, res) => {
   const { date } = req.body;
   if (!date) return res.status(400).json({ error: 'Missing date' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   if (!data.paydaySchedule) data.paydaySchedule = { type: 'custom', customDates: [] };
   if (!data.paydaySchedule.customDates) data.paydaySchedule.customDates = [];
   const idx = data.paydaySchedule.customDates.indexOf(date);
   if (idx >= 0) data.paydaySchedule.customDates.splice(idx, 1);
   else data.paydaySchedule.customDates.push(date);
-  save(data, req.userId);
+  await save(data, req.userId);
   const d = new Date(date + 'T00:00:00');
   const days = getPaydaysForMonth(data.paydaySchedule, d.getFullYear(), d.getMonth());
   const next = getNextPayday(data.paydaySchedule);
@@ -1004,62 +1067,38 @@ app.post('/api/paydays/toggle', requireAuth, (req, res) => {
 });
 
 // ── Feature 1: Emergency Fund Tracker ──
-app.get('/api/emergency', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/emergency', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const now = new Date();
-  // Get last 3 full months of expenses
   let totalExpenses = 0;
   let monthsWithData = 0;
   for (let i = 1; i <= 3; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const txs = filterByMonth(data.transactions, d.getFullYear(), d.getMonth());
-    const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    totalExpenses += exp;
+    totalExpenses += txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     monthsWithData++;
   }
   const avgMonthlyExpenses = monthsWithData > 0 ? totalExpenses / monthsWithData : 0;
   const currentBalance = data.currentBalance || 0;
   const months = avgMonthlyExpenses > 0 ? parseFloat((currentBalance / avgMonthlyExpenses).toFixed(1)) : 0;
-  const hasBal = data.currentBalance !== null && data.currentBalance > 0;
-
   res.json({
-    currentBalance,
-    avgMonthlyExpenses,
-    months,
+    currentBalance, avgMonthlyExpenses, months,
     target3: avgMonthlyExpenses * 3,
     target6: avgMonthlyExpenses * 6,
-    hasBal,
+    hasBal: data.currentBalance !== null && data.currentBalance > 0,
   });
 });
 
 // ── Feature 2: Spending Anomaly Alerts ──
-app.get('/api/anomalies', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/anomalies', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const now = new Date();
-  // Current month spend by category
   const curTxs = filterByMonth(data.transactions, now.getFullYear(), now.getMonth());
   const curByCategory = {};
   curTxs.filter(t => t.type === 'expense').forEach(t => {
     curByCategory[t.category] = (curByCategory[t.category] || 0) + t.amount;
   });
 
-  // Last 3 full months avg by category
-  const histByCategory = {};
-  for (let i = 1; i <= 3; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const txs = filterByMonth(data.transactions, d.getFullYear(), d.getMonth());
-    txs.filter(t => t.type === 'expense').forEach(t => {
-      if (!histByCategory[t.category]) histByCategory[t.category] = [];
-      histByCategory[t.category].push(t.amount);
-    });
-  }
-
-  // Compute averages
-  const avgByCategory = {};
-  for (const [cat, amounts] of Object.entries(histByCategory)) {
-    avgByCategory[cat] = 0;
-  }
-  // Redo: collect monthly totals per category
   const histMonthlyTotals = {};
   for (let i = 1; i <= 3; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -1085,22 +1124,19 @@ app.get('/api/anomalies', requireAuth, (req, res) => {
       anomalies.push({ category: cat, currentSpend, avgSpend, pctAbove });
     }
   }
-
   anomalies.sort((a, b) => b.pctAbove - a.pctAbove);
   res.json(anomalies);
 });
 
 // ── Feature 3: Financial Freedom Date ──
-app.get('/api/freedom', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/freedom', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const now = new Date();
 
-  // Net worth
   const totalAssets = data.assets.reduce((s, a) => s + a.value, 0);
   const totalLiabilities = data.liabilities.reduce((s, l) => s + l.balance, 0);
   const netWorth = totalAssets - totalLiabilities;
 
-  // Annual savings from last 6 months
   let totalNet = 0;
   for (let i = 0; i < 6; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -1116,71 +1152,60 @@ app.get('/api/freedom', requireAuth, (req, res) => {
   const hasTarget = targetAnnualSpend != null;
   const fiNumber = hasTarget ? targetAnnualSpend * 25 : null;
 
-  let yearsToFI = null;
-  let freedomDate = null;
+  let yearsToFI = null, freedomDate = null;
   if (hasTarget && fiNumber !== null && annualSavings > 0) {
     yearsToFI = (fiNumber - netWorth) / annualSavings;
     if (yearsToFI < 0) yearsToFI = 0;
     const fd = new Date(now.getFullYear(), now.getMonth(), 1);
     fd.setFullYear(fd.getFullYear() + Math.floor(yearsToFI));
-    const fracMonths = (yearsToFI % 1) * 12;
-    fd.setMonth(fd.getMonth() + Math.round(fracMonths));
+    fd.setMonth(fd.getMonth() + Math.round((yearsToFI % 1) * 12));
     freedomDate = fd.toLocaleString('default', { month: 'long', year: 'numeric' });
   }
 
   res.json({
-    netWorth, annualSavings, targetAnnualSpend,
-    fiNumber, yearsToFI: yearsToFI !== null ? parseFloat(yearsToFI.toFixed(1)) : null,
+    netWorth, annualSavings, targetAnnualSpend, fiNumber,
+    yearsToFI: yearsToFI !== null ? parseFloat(yearsToFI.toFixed(1)) : null,
     freedomDate, hasTarget,
   });
 });
 
-app.post('/api/freedom/target', requireAuth, (req, res) => {
+app.post('/api/freedom/target', requireAuth, async (req, res) => {
   const { targetAnnualSpend } = req.body;
-  const data = load(req.userId);
+  const data = await load(req.userId);
   data.freedomTarget = parseFloat(targetAnnualSpend) || null;
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true, freedomTarget: data.freedomTarget });
 });
 
 // ── Feature 4: Credit Score Log ──
-app.get('/api/creditscore', requireAuth, (req, res) => {
-  const data = load(req.userId);
-  const scores = [...data.creditScores].sort((a, b) => b.date.localeCompare(a.date));
-  res.json(scores);
+app.get('/api/creditscore', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
+  res.json([...data.creditScores].sort((a, b) => b.date.localeCompare(a.date)));
 });
 
-app.post('/api/creditscore', requireAuth, (req, res) => {
+app.post('/api/creditscore', requireAuth, async (req, res) => {
   const { score, date } = req.body;
   if (!score) return res.status(400).json({ error: 'Missing score' });
-  const data = load(req.userId);
-  const entry = {
-    id: Date.now().toString(),
-    score: parseInt(score),
-    date: date || new Date().toISOString().split('T')[0],
-  };
+  const data = await load(req.userId);
+  const entry = { id: Date.now().toString(), score: parseInt(score), date: date || new Date().toISOString().split('T')[0] };
   data.creditScores.push(entry);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(entry);
 });
 
-app.delete('/api/creditscore/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/creditscore/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.creditScores = data.creditScores.filter(c => c.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 // ── Feature 5: Tax Estimator ──
-app.get('/api/tax', requireAuth, (req, res) => {
+app.get('/api/tax', requireAuth, async (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
-  const data = load(req.userId);
+  const data = await load(req.userId);
 
-  const yearTxs = data.transactions.filter(t => {
-    const d = new Date(t.date);
-    return d.getFullYear() === year && t.type === 'income';
-  });
-
+  const yearTxs = data.transactions.filter(t => new Date(t.date).getFullYear() === year && t.type === 'income');
   const w2Income = yearTxs.filter(t => t.category === 'Salary').reduce((s, t) => s + t.amount, 0);
   const selfIncome = yearTxs.filter(t => ['Freelance', 'Business'].includes(t.category)).reduce((s, t) => s + t.amount, 0);
   const totalIncome = w2Income + selfIncome;
@@ -1188,20 +1213,14 @@ app.get('/api/tax', requireAuth, (req, res) => {
   const standardDeduction = 15000;
   const taxableIncome = Math.max(0, totalIncome - standardDeduction);
 
-  // Federal brackets 2026 (approximate)
   const brackets = [
-    { limit: 11925, rate: 0.10 },
-    { limit: 48475, rate: 0.12 },
-    { limit: 103350, rate: 0.22 },
-    { limit: 197300, rate: 0.24 },
-    { limit: 250525, rate: 0.32 },
-    { limit: 626350, rate: 0.35 },
+    { limit: 11925, rate: 0.10 }, { limit: 48475, rate: 0.12 },
+    { limit: 103350, rate: 0.22 }, { limit: 197300, rate: 0.24 },
+    { limit: 250525, rate: 0.32 }, { limit: 626350, rate: 0.35 },
     { limit: Infinity, rate: 0.37 },
   ];
 
-  let federalTax = 0;
-  let remaining = taxableIncome;
-  let prevLimit = 0;
+  let federalTax = 0, remaining = taxableIncome, prevLimit = 0;
   for (const bracket of brackets) {
     if (remaining <= 0) break;
     const taxable = Math.min(remaining, bracket.limit - prevLimit);
@@ -1212,28 +1231,21 @@ app.get('/api/tax', requireAuth, (req, res) => {
 
   const seTax = selfIncome > 0 ? selfIncome * 0.9235 * 0.153 : 0;
   const totalTax = federalTax + seTax;
-  const quarterlyPayment = totalTax / 4;
-  const effectiveRate = totalIncome > 0 ? (totalTax / totalIncome) * 100 : 0;
-
   res.json({
-    year, totalIncome, w2Income, selfIncome,
-    standardDeduction, taxableIncome,
+    year, totalIncome, w2Income, selfIncome, standardDeduction, taxableIncome,
     federalTax: parseFloat(federalTax.toFixed(2)),
     seTax: parseFloat(seTax.toFixed(2)),
     totalTax: parseFloat(totalTax.toFixed(2)),
-    quarterlyPayment: parseFloat(quarterlyPayment.toFixed(2)),
-    effectiveRate: parseFloat(effectiveRate.toFixed(1)),
+    quarterlyPayment: parseFloat((totalTax / 4).toFixed(2)),
+    effectiveRate: parseFloat((totalIncome > 0 ? (totalTax / totalIncome) * 100 : 0).toFixed(1)),
   });
 });
 
 // ── Feature 6: Weekly Digest ──
 app.post('/api/digest', requireAuth, async (req, res) => {
   const { month } = req.body;
-  const data = load(req.userId);
-  const { year, mo } = (() => {
-    const { year, month: m } = parseMonth(month);
-    return { year, mo: m };
-  })();
+  const data = await load(req.userId);
+  const { year, month: mo } = parseMonth(month);
   const monthLabel = new Date(year, mo, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 
   const txs = filterByMonth(data.transactions, year, mo);
@@ -1243,28 +1255,15 @@ app.post('/api/digest', requireAuth, async (req, res) => {
   const savingsRate = income > 0 ? ((net / income) * 100).toFixed(0) : 0;
 
   const byCategory = {};
-  txs.filter(t => t.type === 'expense').forEach(t => {
-    byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
-  });
+  txs.filter(t => t.type === 'expense').forEach(t => { byCategory[t.category] = (byCategory[t.category] || 0) + t.amount; });
   const top3 = Object.entries(byCategory).sort(([, a], [, b]) => b - a).slice(0, 3).map(([cat, amt]) => `${cat}: $${amt.toFixed(0)}`).join(', ');
-
   const budgetAlerts = data.budgets.filter(b => (byCategory[b.category] || 0) >= b.limit * 0.8).map(b => b.category).join(', ');
-
-  const prompt = `Here's my financial snapshot for ${monthLabel}:
-- Income: $${income.toFixed(0)}
-- Expenses: $${expenses.toFixed(0)}
-- Net: ${net >= 0 ? '+' : ''}$${net.toFixed(0)}
-- Savings rate: ${savingsRate}%
-- Top spending: ${top3 || 'none'}
-${budgetAlerts ? '- Budget alerts: ' + budgetAlerts : ''}
-
-Write a friendly, direct 3-4 sentence financial digest for the week. Be encouraging but honest. No markdown, plain text only.`;
 
   try {
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 200,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: `Here's my financial snapshot for ${monthLabel}:\n- Income: $${income.toFixed(0)}\n- Expenses: $${expenses.toFixed(0)}\n- Net: ${net >= 0 ? '+' : ''}$${net.toFixed(0)}\n- Savings rate: ${savingsRate}%\n- Top spending: ${top3 || 'none'}\n${budgetAlerts ? '- Budget alerts: ' + budgetAlerts : ''}\n\nWrite a friendly, direct 3-4 sentence financial digest for the week. Be encouraging but honest. No markdown, plain text only.` }],
     });
     res.json({ digest: stripMarkdown(msg.content[0].text) });
   } catch (err) {
@@ -1274,60 +1273,49 @@ Write a friendly, direct 3-4 sentence financial digest for the week. Be encourag
 });
 
 // ── Feature 7: Savings Challenges ──
-app.get('/api/challenges', requireAuth, (req, res) => {
-  const data = load(req.userId);
-  res.json(data.challenges || {});
+app.get('/api/challenges', requireAuth, async (req, res) => {
+  res.json((await load(req.userId)).challenges || {});
 });
 
-app.post('/api/challenges/52week', requireAuth, (req, res) => {
+app.post('/api/challenges/52week', requireAuth, async (req, res) => {
   const { week, completed } = req.body;
   if (!week || week < 1 || week > 52) return res.status(400).json({ error: 'Invalid week' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   if (!data.challenges) data.challenges = {};
   if (!data.challenges.weeks52) data.challenges.weeks52 = {};
   data.challenges.weeks52[String(week)] = !!completed;
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true, weeks52: data.challenges.weeks52 });
 });
 
-app.get('/api/challenges/roundup', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/challenges/roundup', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   let roundupTotal = 0;
   data.transactions.filter(t => t.type === 'expense').forEach(t => {
-    const ceil = Math.ceil(t.amount);
-    roundupTotal += ceil - t.amount;
+    roundupTotal += Math.ceil(t.amount) - t.amount;
   });
   res.json({ roundupTotal: parseFloat(roundupTotal.toFixed(2)) });
 });
 
-app.get('/api/challenges/nospend', requireAuth, (req, res) => {
-  const data = load(req.userId);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let streak = 0;
-  let checkDate = new Date(today);
+app.get('/api/challenges/nospend', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let streak = 0, checkDate = new Date(today);
   while (true) {
     const dateStr = checkDate.toISOString().split('T')[0];
-    const hasExpense = data.transactions.some(t => {
-      if (t.type !== 'expense') return false;
-      const d = new Date(t.date);
-      return d.toISOString().split('T')[0] === dateStr;
-    });
+    const hasExpense = data.transactions.some(t => t.type === 'expense' && new Date(t.date).toISOString().split('T')[0] === dateStr);
     if (hasExpense) break;
     streak++;
     checkDate.setDate(checkDate.getDate() - 1);
     if (streak > 365) break;
   }
-
   res.json({ streak });
 });
 
 // ── Feature 8: Milestones & Badges ──
-app.get('/api/milestones', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.get('/api/milestones', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const now = new Date();
-  const badges = [];
 
   const BADGE_DEFS = [
     { id: 'first_tx', label: 'First transaction', emoji: '🎉', description: 'Logged your first transaction' },
@@ -1341,14 +1329,12 @@ app.get('/api/milestones', requireAuth, (req, res) => {
     { id: 'debt_free', label: 'Debt Free', emoji: '✨', description: 'No liabilities — completely debt free' },
   ];
 
+  const badges = [];
   if (data.transactions.length > 0) badges.push('first_tx');
   if (data.budgets.length > 0) badges.push('first_budget');
 
   const monthsSet = new Set();
-  data.transactions.forEach(t => {
-    const d = new Date(t.date);
-    monthsSet.add(`${d.getFullYear()}-${d.getMonth()}`);
-  });
+  data.transactions.forEach(t => { const d = new Date(t.date); monthsSet.add(`${d.getFullYear()}-${d.getMonth()}`); });
   let hasSaver1k = false, hasSaverRate20 = false;
   monthsSet.forEach(key => {
     const [y, m] = key.split('-').map(Number);
@@ -1362,15 +1348,13 @@ app.get('/api/milestones', requireAuth, (req, res) => {
   if (hasSaver1k) badges.push('saver_1k');
   if (hasSaverRate20) badges.push('saver_rate_20');
 
-  let cur = 0;
-  let maxConsecutive = 0;
+  let cur = 0, maxConsecutive = 0;
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const txs = filterByMonth(data.transactions, d.getFullYear(), d.getMonth());
     const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    if (inc - exp > 0) { cur++; maxConsecutive = Math.max(maxConsecutive, cur); }
-    else cur = 0;
+    if (inc - exp > 0) { cur++; maxConsecutive = Math.max(maxConsecutive, cur); } else cur = 0;
   }
   if (maxConsecutive >= 3) badges.push('streak_3');
 
@@ -1388,50 +1372,47 @@ app.get('/api/milestones', requireAuth, (req, res) => {
   if (data.subscriptions.length > 0) badges.push('sub_tracker');
   if (data.liabilities.length === 0) badges.push('debt_free');
 
-  const earned = badges.map(id => BADGE_DEFS.find(b => b.id === id)).filter(Boolean);
-  res.json(earned);
+  res.json(badges.map(id => BADGE_DEFS.find(b => b.id === id)).filter(Boolean));
 });
 
 // ── Feature 9: Shared Expenses ──
-app.get('/api/shared', requireAuth, (req, res) => {
-  const data = load(req.userId);
-  const sorted = [...data.shared].sort((a, b) => b.date.localeCompare(a.date));
-  res.json(sorted);
+app.get('/api/shared', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
+  res.json([...data.shared].sort((a, b) => b.date.localeCompare(a.date)));
 });
 
-app.post('/api/shared', requireAuth, (req, res) => {
+app.post('/api/shared', requireAuth, async (req, res) => {
   const { person, amount, description, date, paidBy } = req.body;
   if (!person || !amount) return res.status(400).json({ error: 'Missing fields' });
-  const data = load(req.userId);
+  const data = await load(req.userId);
   const entry = {
-    id: Date.now().toString(),
-    person,
-    amount: parseFloat(amount),
+    id: Date.now().toString(), person, amount: parseFloat(amount),
     description: description || '',
     date: date || new Date().toISOString().split('T')[0],
-    paidBy: paidBy || 'me',
-    settled: false,
+    paidBy: paidBy || 'me', settled: false,
   };
   data.shared.push(entry);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(entry);
 });
 
-app.post('/api/shared/:id/settle', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.post('/api/shared/:id/settle', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   const entry = data.shared.find(s => s.id === req.params.id);
   if (!entry) return res.status(404).json({ error: 'Not found' });
   entry.settled = !entry.settled;
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json(entry);
 });
 
-app.delete('/api/shared/:id', requireAuth, (req, res) => {
-  const data = load(req.userId);
+app.delete('/api/shared/:id', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
   data.shared = data.shared.filter(s => s.id !== req.params.id);
-  save(data, req.userId);
+  await save(data, req.userId);
   res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => console.log(`Clarity running on http://localhost:${PORT}`));
+initDB()
+  .then(() => app.listen(PORT, () => console.log(`Clarity running on http://localhost:${PORT}`)))
+  .catch(err => { console.error('DB init failed:', err); process.exit(1); });
