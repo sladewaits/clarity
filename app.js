@@ -1946,7 +1946,7 @@ document.getElementById('registerBtn').addEventListener('click', async () => {
     authToken = data.token;
     currentUser = data.user;
     localStorage.setItem('clarity_token', authToken);
-    showApp();
+    showApp(true);
   } catch (err) {
     errEl.textContent = err.message;
     errEl.style.display = '';
@@ -2024,13 +2024,112 @@ function showAuth() {
   document.getElementById('authOverlay').style.display = 'flex';
 }
 
-function showApp() {
+function showApp(isNew = false) {
   document.getElementById('authOverlay').style.display = 'none';
   document.getElementById('headerAvatar').textContent = currentUser.avatar || '😊';
   document.getElementById('headerName').textContent = currentUser.name || '';
   updateMonthNav();
   updateCalMonthLabel();
   loadOverview();
+  if (isNew) setTimeout(() => startTutorial(), 600);
 }
+
+// ── Tutorial ──
+const TUTORIAL_STEPS = [
+  {
+    emoji: '👋',
+    title: 'Welcome to Clarity!',
+    body: () => `Hey ${currentUser?.name?.split(' ')[0] || 'there'}! You're all set. Let's take a 60-second tour so you know where everything is.`,
+    tab: null,
+  },
+  {
+    emoji: '📊',
+    title: 'Your Overview',
+    body: () => 'This is your home base. At a glance you can see your net for the month, savings rate, financial health score, spending breakdown, and upcoming bills.',
+    tab: 'overview',
+  },
+  {
+    emoji: '💸',
+    title: 'Log Transactions',
+    body: () => 'Tap Transactions to log income and expenses. You can type them in manually or snap a photo of a check or receipt and let AI fill it in for you.',
+    tab: 'transactions',
+  },
+  {
+    emoji: '🗂️',
+    title: 'Plan Your Money',
+    body: () => 'The Plan tab is your financial control center — set spending budgets, create savings goals, track subscriptions, manage debt, and monitor your net worth.',
+    tab: 'plan',
+  },
+  {
+    emoji: '📅',
+    title: 'Track Paydays',
+    body: () => 'Set your pay schedule in the Calendar tab and Clarity will show you exactly how many days until your next payday, highlighted right on the calendar.',
+    tab: 'calendar',
+  },
+  {
+    emoji: '🤖',
+    title: 'Ask Clarity Anything',
+    body: () => 'The Chat tab connects you to an AI that knows your real financial data. Ask "Where am I overspending?" or "Am I on track for my goals?" and get honest answers.',
+    tab: 'chat',
+  },
+  {
+    emoji: '🚀',
+    title: "You're ready!",
+    body: () => 'Start by adding your first transaction — even one entry unlocks your spending chart and AI insights. Your financial picture gets clearer every day.',
+    tab: 'transactions',
+  },
+];
+
+let tutorialStep = 0;
+
+function startTutorial() {
+  tutorialStep = 0;
+  renderTutorialStep();
+  document.getElementById('tutorialOverlay').classList.add('open');
+}
+
+function renderTutorialStep() {
+  const step = TUTORIAL_STEPS[tutorialStep];
+  const total = TUTORIAL_STEPS.length;
+  const isLast = tutorialStep === total - 1;
+
+  document.getElementById('tutorialEmoji').textContent = step.emoji;
+  document.getElementById('tutorialTitle').textContent = step.title;
+  document.getElementById('tutorialBody').textContent = step.body();
+  document.getElementById('tutorialNext').textContent = isLast ? 'Get started →' : 'Next →';
+
+  // Dots
+  document.getElementById('tutorialDots').innerHTML = TUTORIAL_STEPS.map((_, i) =>
+    `<div class="tutorial-dot ${i === tutorialStep ? 'active' : ''}"></div>`
+  ).join('');
+
+  // Switch to relevant tab if specified
+  if (step.tab) {
+    document.querySelectorAll('.tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === step.tab);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'tab-' + step.tab);
+    });
+  }
+}
+
+function closeTutorial() {
+  document.getElementById('tutorialOverlay').classList.remove('open');
+  // Always land on overview when done
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'overview'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-overview'));
+}
+
+document.getElementById('tutorialNext').addEventListener('click', () => {
+  if (tutorialStep < TUTORIAL_STEPS.length - 1) {
+    tutorialStep++;
+    renderTutorialStep();
+  } else {
+    closeTutorial();
+  }
+});
+
+document.getElementById('tutorialSkip').addEventListener('click', closeTutorial);
 
 initApp();
