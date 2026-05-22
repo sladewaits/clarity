@@ -15,12 +15,49 @@
 </head>
 <body>
 
+  <!-- Auth overlay -->
+  <div id="authOverlay" style="display:none">
+    <div class="auth-screen">
+      <div class="auth-logo">
+        <span class="logo">Clarity</span>
+        <span class="logo-tag">finance tracker</span>
+      </div>
+
+      <!-- Login form -->
+      <div id="authLogin">
+        <h2 class="auth-title">Welcome back</h2>
+        <p class="auth-sub">Sign in to your account</p>
+        <input class="form-input" id="loginEmail" type="email" placeholder="Email address" autocomplete="email" />
+        <input class="form-input" id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
+        <div class="auth-error" id="loginError" style="display:none"></div>
+        <button class="primary-btn" id="loginBtn">Sign in</button>
+        <div class="auth-switch">No account? <button class="auth-link" id="showRegister">Create one</button></div>
+      </div>
+
+      <!-- Register form -->
+      <div id="authRegister" style="display:none">
+        <h2 class="auth-title">Create account</h2>
+        <p class="auth-sub">Start tracking your finances</p>
+        <input class="form-input" id="regName" type="text" placeholder="Your name" autocomplete="name" />
+        <input class="form-input" id="regEmail" type="email" placeholder="Email address" autocomplete="email" />
+        <input class="form-input" id="regPassword" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" />
+        <div class="auth-error" id="regError" style="display:none"></div>
+        <button class="primary-btn" id="registerBtn">Create account</button>
+        <div class="auth-switch">Already have an account? <button class="auth-link" id="showLogin">Sign in</button></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Header -->
   <header class="header">
     <div class="header-brand">
       <span class="logo">Clarity</span>
       <span class="logo-tag">finance tracker</span>
     </div>
+    <button class="profile-btn" id="profileBtn">
+      <span class="profile-avatar" id="headerAvatar">😊</span>
+      <span class="profile-name" id="headerName"></span>
+    </button>
   </header>
 
   <!-- Tab bar -->
@@ -778,6 +815,31 @@
       </button>
     </div>
 
+  </div>
+
+  <!-- Profile panel -->
+  <div class="profile-sheet" id="profileSheet">
+    <div class="profile-sheet-backdrop" id="profileSheetBackdrop"></div>
+    <div class="profile-sheet-panel">
+      <div class="cat-sheet-handle"></div>
+      <div class="profile-sheet-header">
+        <h3 class="profile-sheet-title">Profile</h3>
+        <button class="profile-logout-btn" id="logoutBtn">Sign out</button>
+      </div>
+      <div class="profile-big-avatar" id="profileBigAvatar">😊</div>
+      <div class="profile-avatar-picker" id="avatarPicker">
+        😊 😎 🤑 💪 🧠 🦁 🐯 🦊 🐻 🐼 🦄 🌟 🚀 💎 🏆 🌈
+      </div>
+      <div style="margin-top:16px">
+        <label class="schedule-field-label">Your name</label>
+        <input class="form-input" id="profileName" type="text" placeholder="Name" />
+        <label class="schedule-field-label">Monthly income goal ($)</label>
+        <input class="form-input" id="profileIncomeGoal" type="number" placeholder="e.g. 5000" min="0" />
+        <label class="schedule-field-label">Target savings rate (%)</label>
+        <input class="form-input" id="profileSavingsRate" type="number" placeholder="e.g. 20" min="0" max="100" />
+        <button class="primary-btn" id="saveProfileBtn">Save profile</button>
+      </div>
+    </div>
   </div>
 
   <!-- Category drill-down sheet -->

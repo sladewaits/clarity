@@ -1,3 +1,18 @@
+// ── Auth state ──
+let authToken = localStorage.getItem('clarity_token');
+let currentUser = null;
+
+function apiFetch(url, opts = {}) {
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {}),
+      ...(opts.headers || {}),
+    },
+  });
+}
+
 // ── Constants ──
 const CATEGORY_EMOJI = {
   'Salary': '💼', 'Freelance': '💻', 'Business': '🏢', 'Investment': '📈', 'Other income': '💰',
@@ -149,7 +164,7 @@ function dateLabel(d) {
 // ── Overview ──
 async function loadOverview() {
   const [ovRes] = await Promise.all([
-    fetch(`/api/overview?month=${monthStr()}`),
+    apiFetch(`/api/overview?month=${monthStr()}`),
   ]);
   const data = await ovRes.json();
 
@@ -268,7 +283,7 @@ async function openCategorySheet(category) {
 
   catSheet.classList.add('open');
 
-  const res = await fetch(`/api/transactions?month=${monthStr()}`);
+  const res = await apiFetch(`/api/transactions?month=${monthStr()}`);
   const txs = await res.json();
   const filtered = txs.filter(t => t.category === category && t.type === 'expense');
   const total = filtered.reduce((s, t) => s + t.amount, 0);
@@ -296,9 +311,8 @@ async function loadInsights() {
   const insightText = document.getElementById('insightText');
   insightText.innerHTML = '<span class="insight-loading" style="width:90%;display:block"></span><span class="insight-loading" style="width:65%;display:block"></span>';
   try {
-    const res = await fetch('/api/insights', {
+    const res = await apiFetch('/api/insights', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month: monthStr() }),
     });
     const data = await res.json();
@@ -329,9 +343,8 @@ document.getElementById('txSubmitBtn').addEventListener('click', async () => {
 
   const btn = document.getElementById('txSubmitBtn');
   btn.disabled = true;
-  await fetch('/api/transactions', {
+  await apiFetch('/api/transactions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: txType, amount, category, description, recurring }),
   });
   btn.disabled = false;
@@ -344,11 +357,11 @@ document.getElementById('txSubmitBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('exportBtn').addEventListener('click', () => {
-  window.location.href = `/api/export?month=${monthStr()}`;
+  window.location.href = `/api/export?month=${monthStr()}&token=${authToken}`;
 });
 
 async function loadTransactions() {
-  const res = await fetch(`/api/transactions?month=${monthStr()}`);
+  const res = await apiFetch(`/api/transactions?month=${monthStr()}`);
   const txs = await res.json();
   const list = document.getElementById('txList');
 
@@ -378,7 +391,7 @@ async function loadTransactions() {
 
   list.querySelectorAll('.tx-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/transactions/${btn.dataset.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/transactions/${btn.dataset.id}`, { method: 'DELETE' });
       loadTransactions();
     });
   });
@@ -390,9 +403,8 @@ document.getElementById('budgetBtn').addEventListener('click', async () => {
   const limit = document.getElementById('budgetLimit').value;
   if (!category || !limit) return;
 
-  await fetch('/api/budgets', {
+  await apiFetch('/api/budgets', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category, limit }),
   });
 
@@ -403,8 +415,8 @@ document.getElementById('budgetBtn').addEventListener('click', async () => {
 
 async function loadBudgets() {
   const [bRes, oRes] = await Promise.all([
-    fetch('/api/budgets'),
-    fetch(`/api/overview?month=${monthStr()}`),
+    apiFetch('/api/budgets'),
+    apiFetch(`/api/overview?month=${monthStr()}`),
   ]);
   const budgets = await bRes.json();
   const overview = await oRes.json();
@@ -445,7 +457,7 @@ async function loadBudgets() {
 
   list.querySelectorAll('.budget-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/budgets/${encodeURIComponent(btn.dataset.cat)}`, { method: 'DELETE' });
+      await apiFetch(`/api/budgets/${encodeURIComponent(btn.dataset.cat)}`, { method: 'DELETE' });
       loadBudgets();
     });
   });
@@ -457,9 +469,8 @@ document.getElementById('goalBtn').addEventListener('click', async () => {
   const target = document.getElementById('goalTarget').value;
   if (!name || !target) return;
 
-  await fetch('/api/goals', {
+  await apiFetch('/api/goals', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, target }),
   });
 
@@ -469,7 +480,7 @@ document.getElementById('goalBtn').addEventListener('click', async () => {
 });
 
 async function loadGoals() {
-  const res = await fetch('/api/goals');
+  const res = await apiFetch('/api/goals');
   const goals = await res.json();
   const list = document.getElementById('goalsList');
 
@@ -519,9 +530,8 @@ async function loadGoals() {
       const amount = input.value;
       if (!amount) return;
       btn.disabled = true;
-      await fetch(`/api/goals/${id}/deposit`, {
+      await apiFetch(`/api/goals/${id}/deposit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount }),
       });
       loadGoals();
@@ -530,7 +540,7 @@ async function loadGoals() {
 
   list.querySelectorAll('.goal-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/goals/${btn.dataset.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/goals/${btn.dataset.id}`, { method: 'DELETE' });
       loadGoals();
     });
   });
@@ -585,9 +595,8 @@ async function sendMessage() {
   const botDiv = addMsg('assistant', '');
   let buffer = '';
 
-  const res = await fetch('/api/chat', {
+  const res = await apiFetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: text, month: monthStr() }),
   });
 
@@ -654,9 +663,8 @@ document.getElementById('subSubmitBtn').addEventListener('click', async () => {
 
   const btn = document.getElementById('subSubmitBtn');
   btn.disabled = true;
-  await fetch('/api/subscriptions', {
+  await apiFetch('/api/subscriptions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, amount, cycle, nextBilling }),
   });
   btn.disabled = false;
@@ -668,7 +676,7 @@ document.getElementById('subSubmitBtn').addEventListener('click', async () => {
 });
 
 async function loadSubscriptions() {
-  const res = await fetch('/api/subscriptions');
+  const res = await apiFetch('/api/subscriptions');
   const { subscriptions, monthlyTotal } = await res.json();
 
   const summaryEl = document.getElementById('subSummary');
@@ -731,9 +739,9 @@ async function loadSubscriptions() {
     btn.addEventListener('click', async () => {
       const { action, id } = btn.dataset;
       if (action === 'delete') {
-        await fetch(`/api/subscriptions/${id}`, { method: 'DELETE' });
+        await apiFetch(`/api/subscriptions/${id}`, { method: 'DELETE' });
       } else if (action === 'cancel') {
-        await fetch(`/api/subscriptions/${id}/cancel`, { method: 'POST' });
+        await apiFetch(`/api/subscriptions/${id}/cancel`, { method: 'POST' });
       }
       loadSubscriptions();
     });
@@ -742,7 +750,7 @@ async function loadSubscriptions() {
 
 // ── Health score ──
 async function loadHealthScore() {
-  const res = await fetch('/api/score');
+  const res = await apiFetch('/api/score');
   const data = await res.json();
   document.getElementById('scoreNumber').textContent = data.score;
   document.getElementById('scoreGrade').textContent = data.grade;
@@ -769,9 +777,8 @@ document.getElementById('forecastSetBtn').addEventListener('click', () => {
 document.getElementById('forecastSaveBtn').addEventListener('click', async () => {
   const balance = document.getElementById('forecastBalanceInput').value;
   if (!balance) return;
-  await fetch('/api/forecast/balance', {
+  await apiFetch('/api/forecast/balance', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ balance }),
   });
   document.getElementById('forecastSetRow').style.display = 'none';
@@ -779,7 +786,7 @@ document.getElementById('forecastSaveBtn').addEventListener('click', async () =>
 });
 
 async function loadForecast() {
-  const res = await fetch('/api/forecast');
+  const res = await apiFetch('/api/forecast');
   const data = await res.json();
 
   const cpEl = document.getElementById('forecastCheckpoints');
@@ -817,7 +824,7 @@ async function loadForecast() {
 const ASSET_ICON = { liquid: '💵', investment: '📈', property: '🏠', vehicle: '🚗', other: '📦' };
 
 async function loadNetWorth() {
-  const res = await fetch('/api/networth');
+  const res = await apiFetch('/api/networth');
   const data = await res.json();
 
   document.getElementById('nwAssets').textContent = fmt(data.totalAssets);
@@ -852,7 +859,7 @@ async function loadNetWorth() {
 
   document.querySelectorAll('.nw-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/${btn.dataset.type}/${btn.dataset.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/${btn.dataset.type}/${btn.dataset.id}`, { method: 'DELETE' });
       loadNetWorth();
     });
   });
@@ -863,8 +870,8 @@ document.getElementById('addAssetBtn').addEventListener('click', async () => {
   const type = document.getElementById('assetType').value;
   const value = document.getElementById('assetValue').value;
   if (!name || !value) return;
-  await fetch('/api/assets', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+  await apiFetch('/api/assets', {
+    method: 'POST',
     body: JSON.stringify({ name, type, value }),
   });
   document.getElementById('assetName').value = '';
@@ -878,8 +885,8 @@ document.getElementById('addLiabBtn').addEventListener('click', async () => {
   const interestRate = document.getElementById('liabRate').value;
   const minPayment = document.getElementById('liabMinPayment').value;
   if (!name || !balance) return;
-  await fetch('/api/liabilities', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+  await apiFetch('/api/liabilities', {
+    method: 'POST',
     body: JSON.stringify({ name, balance, interestRate, minPayment }),
   });
   document.getElementById('liabName').value = '';
@@ -919,7 +926,7 @@ function simulatePayoff(debts, extra) {
 }
 
 async function loadDebtPlanner() {
-  const res = await fetch('/api/networth');
+  const res = await apiFetch('/api/networth');
   const data = await res.json();
   const debts = data.liabilities;
 
@@ -933,7 +940,7 @@ async function loadDebtPlanner() {
 
 document.getElementById('debtCalcBtn').addEventListener('click', async () => {
   const extra = parseFloat(document.getElementById('debtExtraPayment').value) || 0;
-  const res = await fetch('/api/networth');
+  const res = await apiFetch('/api/networth');
   const data = await res.json();
   const debts = data.liabilities;
 
@@ -1006,7 +1013,7 @@ document.getElementById('calNext').addEventListener('click', () => {
 });
 
 async function loadCalendar() {
-  const res = await fetch(`/api/paydays?month=${calMonthStr()}`);
+  const res = await apiFetch(`/api/paydays?month=${calMonthStr()}`);
   const data = await res.json();
   calPaydayDays = data.days || [];
   renderCalendarGrid(calPaydayDays);
@@ -1072,9 +1079,8 @@ function renderCalendarGrid(paydayDays) {
   if (calIsCustom) {
     grid.querySelectorAll('.cal-cell.cal-clickable').forEach(cell => {
       cell.addEventListener('click', async () => {
-        const res = await fetch('/api/paydays/toggle', {
+        const res = await apiFetch('/api/paydays/toggle', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: cell.dataset.date }),
         });
         const data = await res.json();
@@ -1146,16 +1152,15 @@ document.getElementById('scheduleSaveBtn').addEventListener('click', async () =>
     ref.setDate(ref.getDate() - (7 - diff) % 7);
     schedule.startDate = `${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}-${String(ref.getDate()).padStart(2,'0')}`;
   } else if (type === 'custom') {
-    const existing = await fetch('/api/paydays').then(r => r.json());
+    const existing = await apiFetch('/api/paydays').then(r => r.json());
     schedule.customDates = existing.schedule?.customDates || [];
   }
 
   const btn = document.getElementById('scheduleSaveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving...';
-  const res = await fetch('/api/paydays', {
+  const res = await apiFetch('/api/paydays', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ schedule }),
   });
   const data = await res.json();
@@ -1170,8 +1175,8 @@ document.getElementById('scheduleSaveBtn').addEventListener('click', async () =>
 // ── Alerts (Feature 2 integrated) ──
 async function loadAlerts() {
   const [alertRes, anomalyRes] = await Promise.all([
-    fetch('/api/alerts'),
-    fetch('/api/anomalies'),
+    apiFetch('/api/alerts'),
+    apiFetch('/api/anomalies'),
   ]);
   const alerts = await alertRes.json();
   const anomalies = await anomalyRes.json();
@@ -1202,7 +1207,7 @@ async function loadAlerts() {
 
 // ── Upcoming bills ──
 async function loadUpcoming() {
-  const res = await fetch('/api/upcoming');
+  const res = await apiFetch('/api/upcoming');
   const bills = await res.json();
   const card = document.getElementById('upcomingCard');
   const list = document.getElementById('upcomingList');
@@ -1230,7 +1235,7 @@ async function loadUpcoming() {
 
 // ── Trends chart ──
 async function loadTrends() {
-  const res = await fetch('/api/trends');
+  const res = await apiFetch('/api/trends');
   const months = await res.json();
   const el = document.getElementById('trendsChart');
   const hasData = months.some(m => m.income > 0 || m.expenses > 0);
@@ -1276,9 +1281,8 @@ document.getElementById('scanInput').addEventListener('change', async (e) => {
     const mediaType = file.type || 'image/jpeg';
 
     try {
-      const res = await fetch('/api/analyze-check', {
+      const res = await apiFetch('/api/analyze-check', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64, mediaType }),
       });
       const data = await res.json();
@@ -1323,9 +1327,8 @@ document.getElementById('recSubmitBtn').addEventListener('click', async () => {
   const startDate = document.getElementById('recStartDate').value;
   if (!amount || !category || !frequency) return;
 
-  await fetch('/api/recurring', {
+  await apiFetch('/api/recurring', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: recType, amount, category, description, frequency, startDate }),
   });
 
@@ -1338,7 +1341,7 @@ document.getElementById('recSubmitBtn').addEventListener('click', async () => {
 });
 
 async function loadRecurring() {
-  const res = await fetch('/api/recurring');
+  const res = await apiFetch('/api/recurring');
   const { recurring, due } = await res.json();
 
   const banner = document.getElementById('dueBanner');
@@ -1376,16 +1379,15 @@ async function loadRecurring() {
 
   list.querySelectorAll('.rec-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/recurring/${btn.dataset.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/recurring/${btn.dataset.id}`, { method: 'DELETE' });
       loadRecurring();
     });
   });
 }
 
 document.getElementById('dueBannerBtn').addEventListener('click', async () => {
-  await fetch('/api/recurring/log', {
+  await apiFetch('/api/recurring/log', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
   loadRecurring();
@@ -1395,8 +1397,8 @@ document.getElementById('dueBannerBtn').addEventListener('click', async () => {
 // ── Savings ──
 async function loadSavings() {
   const [ovRes, trendsRes] = await Promise.all([
-    fetch(`/api/overview?month=${monthStr()}`),
-    fetch('/api/trends'),
+    apiFetch(`/api/overview?month=${monthStr()}`),
+    apiFetch('/api/trends'),
   ]);
   const ov = await ovRes.json();
   const trends = await trendsRes.json();
@@ -1453,7 +1455,7 @@ async function loadSavings() {
 
 // ── Feature 1: Emergency Fund ──
 async function loadEmergency() {
-  const res = await fetch('/api/emergency');
+  const res = await apiFetch('/api/emergency');
   const d = await res.json();
   const el = document.getElementById('emergencyContent');
 
@@ -1479,7 +1481,7 @@ async function loadEmergency() {
 
 // ── Feature 3: Financial Freedom ──
 async function loadFreedom() {
-  const res = await fetch('/api/freedom');
+  const res = await apiFetch('/api/freedom');
   const d = await res.json();
 
   const setArea = document.getElementById('freedomSetArea');
@@ -1517,9 +1519,8 @@ async function loadFreedom() {
 document.getElementById('freedomSaveBtn').addEventListener('click', async () => {
   const val = document.getElementById('freedomTargetInput').value;
   if (!val) return;
-  await fetch('/api/freedom/target', {
+  await apiFetch('/api/freedom/target', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ targetAnnualSpend: val }),
   });
   document.getElementById('freedomTargetInput').value = '';
@@ -1551,9 +1552,8 @@ document.getElementById('digestBtn').addEventListener('click', async () => {
   btn.disabled = true;
 
   try {
-    const res = await fetch('/api/digest', {
+    const res = await apiFetch('/api/digest', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month: monthStr() }),
     });
     const data = await res.json();
@@ -1569,7 +1569,7 @@ document.getElementById('digestBtn').addEventListener('click', async () => {
 
 // ── Feature 4: Credit Scores ──
 async function loadCreditScores() {
-  const res = await fetch('/api/creditscore');
+  const res = await apiFetch('/api/creditscore');
   const scores = await res.json();
 
   const latestEl = document.getElementById('creditLatest');
@@ -1606,7 +1606,7 @@ async function loadCreditScores() {
 
   listEl.querySelectorAll('.nw-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await fetch(`/api/creditscore/${btn.dataset.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/creditscore/${btn.dataset.id}`, { method: 'DELETE' });
       loadCreditScores();
     });
   });
@@ -1624,9 +1624,8 @@ document.getElementById('creditAddBtn').addEventListener('click', async () => {
   const score = document.getElementById('creditScoreInput').value;
   const date = document.getElementById('creditDateInput').value;
   if (!score) return;
-  await fetch('/api/creditscore', {
+  await apiFetch('/api/creditscore', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ score, date }),
   });
   document.getElementById('creditScoreInput').value = '';
@@ -1653,7 +1652,7 @@ async function loadTaxEstimator() {
 
 document.getElementById('taxCalcBtn').addEventListener('click', async () => {
   const year = document.getElementById('taxYearSelect').value;
-  const res = await fetch(`/api/tax?year=${year}`);
+  const res = await apiFetch(`/api/tax?year=${year}`);
   const d = await res.json();
   const el = document.getElementById('taxResults');
   el.style.display = '';
@@ -1709,9 +1708,9 @@ document.getElementById('taxCalcBtn').addEventListener('click', async () => {
 // ── Feature 7: Savings Challenges ──
 async function loadChallenges() {
   const [challengeRes, roundupRes, nospendRes] = await Promise.all([
-    fetch('/api/challenges'),
-    fetch('/api/challenges/roundup'),
-    fetch('/api/challenges/nospend'),
+    apiFetch('/api/challenges'),
+    apiFetch('/api/challenges/roundup'),
+    apiFetch('/api/challenges/nospend'),
   ]);
   const challenges = await challengeRes.json();
   const { roundupTotal } = await roundupRes.json();
@@ -1739,9 +1738,8 @@ async function loadChallenges() {
     box.dataset.week = w;
     box.textContent = w;
     box.addEventListener('click', async () => {
-      await fetch('/api/challenges/52week', {
+      await apiFetch('/api/challenges/52week', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ week: w, completed: !done }),
       });
       loadChallenges();
@@ -1758,7 +1756,7 @@ async function loadChallenges() {
 
 // ── Feature 8: Milestones ──
 async function loadMilestones() {
-  const res = await fetch('/api/milestones');
+  const res = await apiFetch('/api/milestones');
   const badges = await res.json();
   const strip = document.getElementById('milestonesStrip');
   const inner = document.getElementById('milestonesInner');
@@ -1797,9 +1795,8 @@ document.getElementById('sharedAddBtn').addEventListener('click', async () => {
   const date = document.getElementById('sharedDate').value;
   if (!person || !amount) return;
 
-  await fetch('/api/shared', {
+  await apiFetch('/api/shared', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ person, amount, description, date, paidBy: sharedPaidBy }),
   });
 
@@ -1820,7 +1817,7 @@ function personColor(name) {
 }
 
 async function loadShared() {
-  const res = await fetch('/api/shared');
+  const res = await apiFetch('/api/shared');
   const items = await res.json();
   const showSettled = document.getElementById('sharedShowSettled').checked;
 
@@ -1874,9 +1871,9 @@ async function loadShared() {
     btn.addEventListener('click', async () => {
       const { action, id } = btn.dataset;
       if (action === 'settle') {
-        await fetch(`/api/shared/${id}/settle`, { method: 'POST' });
+        await apiFetch(`/api/shared/${id}/settle`, { method: 'POST' });
       } else if (action === 'delete') {
-        await fetch(`/api/shared/${id}`, { method: 'DELETE' });
+        await apiFetch(`/api/shared/${id}`, { method: 'DELETE' });
       }
       loadShared();
     });
@@ -1898,7 +1895,142 @@ loadOverview = async function () {
   loadMilestones();
 };
 
+// ── Auth handlers ──
+document.getElementById('showRegister').addEventListener('click', () => {
+  document.getElementById('authLogin').style.display = 'none';
+  document.getElementById('authRegister').style.display = '';
+});
+document.getElementById('showLogin').addEventListener('click', () => {
+  document.getElementById('authRegister').style.display = 'none';
+  document.getElementById('authLogin').style.display = '';
+});
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  try {
+    const res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem('clarity_token', authToken);
+    showApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = '';
+  }
+});
+
+document.getElementById('registerBtn').addEventListener('click', async () => {
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const errEl = document.getElementById('regError');
+  errEl.style.display = 'none';
+  if (!name || !email || !password) { errEl.textContent = 'All fields required'; errEl.style.display = ''; return; }
+  try {
+    const res = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem('clarity_token', authToken);
+    showApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = '';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('clarity_token');
+  authToken = null;
+  currentUser = null;
+  document.getElementById('profileSheet').classList.remove('open');
+  document.getElementById('authLogin').style.display = '';
+  document.getElementById('authRegister').style.display = 'none';
+  showAuth();
+});
+
+// ── Profile panel ──
+document.getElementById('profileBtn').addEventListener('click', () => {
+  if (!currentUser) return;
+  document.getElementById('profileName').value = currentUser.name || '';
+  document.getElementById('profileIncomeGoal').value = currentUser.monthlyIncomeGoal || '';
+  document.getElementById('profileSavingsRate').value = currentUser.targetSavingsRate || 20;
+  document.getElementById('profileBigAvatar').textContent = currentUser.avatar || '😊';
+  document.getElementById('profileSheet').classList.add('open');
+});
+
+document.getElementById('profileSheetBackdrop').addEventListener('click', () => {
+  document.getElementById('profileSheet').classList.remove('open');
+});
+
+document.getElementById('avatarPicker').addEventListener('click', (e) => {
+  const emoji = e.target.textContent.trim();
+  if (!emoji || emoji.length > 2) return;
+  document.getElementById('profileBigAvatar').textContent = emoji;
+});
+
+document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+  const name = document.getElementById('profileName').value.trim();
+  const avatar = document.getElementById('profileBigAvatar').textContent;
+  const monthlyIncomeGoal = parseFloat(document.getElementById('profileIncomeGoal').value) || 0;
+  const targetSavingsRate = parseFloat(document.getElementById('profileSavingsRate').value) || 20;
+
+  const res = await apiFetch('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify({ name, avatar, monthlyIncomeGoal, targetSavingsRate }),
+  });
+  const updated = await res.json();
+  currentUser = { ...currentUser, ...updated };
+  document.getElementById('headerAvatar').textContent = avatar;
+  document.getElementById('headerName').textContent = name;
+  document.getElementById('profileSheet').classList.remove('open');
+});
+
 // ── Init ──
-updateMonthNav();
-updateCalMonthLabel();
-loadOverview();
+async function initApp() {
+  if (!authToken) {
+    showAuth();
+    return;
+  }
+  try {
+    const res = await fetch('/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    if (!res.ok) throw new Error('invalid');
+    currentUser = await res.json();
+    showApp();
+  } catch {
+    localStorage.removeItem('clarity_token');
+    authToken = null;
+    showAuth();
+  }
+}
+
+function showAuth() {
+  document.getElementById('authOverlay').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('authOverlay').style.display = 'none';
+  document.getElementById('headerAvatar').textContent = currentUser.avatar || '😊';
+  document.getElementById('headerName').textContent = currentUser.name || '';
+  updateMonthNav();
+  updateCalMonthLabel();
+  loadOverview();
+}
+
+initApp();

@@ -3,17 +3,29 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const DATA_FILE = process.env.DATA_DIR
-  ? path.join(process.env.DATA_DIR, 'data.json')
-  : path.join(__dirname, 'data.json');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'clarity-secret-change-in-prod';
+const USERS_FILE = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'users.json')
+  : path.join(__dirname, 'users.json');
 
 app.use(express.json());
 app.use(express.static(__dirname));
 
-function load() {
+function userDataFile(userId) {
+  const base = process.env.DATA_DIR || __dirname;
+  const dir = path.join(base, 'users', userId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'data.json');
+}
+
+function load(userId) {
+  const DATA_FILE = userDataFile(userId);
   const defaults = {
     transactions: [], budgets: [], goals: [], messages: [],
     paydaySchedule: null, recurring: [], subscriptions: [],
@@ -38,6 +50,32 @@ function load() {
       freedomTarget: d.freedomTarget ?? null,
     };
   } catch { return defaults; }
+}
+
+function save(data, userId) {
+  fs.writeFileSync(userDataFile(userId), JSON.stringify(data, null, 2));
+}
+
+function loadUsers() {
+  if (!fs.existsSync(USERS_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); } catch { return []; }
+}
+
+function saveUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(header.slice(7), JWT_SECRET);
+    req.userId = payload.userId;
+    req.user = payload;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
 // Advance a recurring item's nextDate by its frequency
@@ -121,10 +159,6 @@ function getNextPayday(schedule) {
   return null;
 }
 
-function save(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
 function stripMarkdown(text) {
   return text
     .replace(/^#{1,6}\s+/gm, '')
@@ -190,9 +224,9 @@ function buildSystem(data, monthStr) {
     .map(([cat, amt]) => `${cat}: $${amt.toFixed(2)}`)
     .join(', ');
 
-  return `Your name is Clarity. You're Slade's personal finance assistant — direct, sharp, and focused on helping him actually understand and improve his money situation.
+  return `Your name is Clarity. You're a personal finance assistant — direct, sharp, and focused on helping the user actually understand and improve their money situation.
 
-Slade's financial data for ${monthLabel}:
+User's financial data for ${monthLabel}:
 - Income: $${income.toFixed(2)}
 - Expenses: $${expenses.toFixed(2)}
 - Net: ${net >= 0 ? '+' : ''}$${net.toFixed(2)}
@@ -202,14 +236,86 @@ ${topCategories ? '- Top spending: ' + topCategories : ''}
 ${budgetSummary ? '\nBudget status:\n' + budgetSummary : ''}
 ${goalSummary ? '\nSavings goals:\n' + goalSummary : ''}
 
-Be conversational, not financial-advisor-formal. Don't lecture. Give concrete, actionable takes. If something looks off, say so directly. If he's doing well, acknowledge it. Keep responses short — 3-4 sentences max unless walking through something complex.
+Be conversational, not financial-advisor-formal. Don't lecture. Give concrete, actionable takes. If something looks off, say so directly. If they're doing well, acknowledge it. Keep responses short — 3-4 sentences max unless walking through something complex.
 
 Format: plain text only. No markdown. No pound-sign headers, no asterisk bold, no bullet dashes. Write in short paragraphs. Real words, direct sentences.`;
 }
 
+// ── Auth routes ──
+
+app.post('/auth/register', async (req, res) => {
+  const { email, password, name } = req.body;
+  if (!email || !password || !name) return res.status(400).json({ error: 'All fields required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  const users = loadUsers();
+  if (users.find(u => u.email === email)) return res.status(400).json({ error: 'Email already registered' });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = {
+    id: Date.now().toString(),
+    email,
+    name,
+    passwordHash,
+    avatar: '😊',
+    targetSavingsRate: 20,
+    monthlyIncomeGoal: 0,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(user);
+  saveUsers(users);
+
+  const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '90d' });
+  res.json({
+    token,
+    user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar, targetSavingsRate: user.targetSavingsRate, monthlyIncomeGoal: user.monthlyIncomeGoal },
+  });
+});
+
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+  const users = loadUsers();
+  const user = users.find(u => u.email === email);
+  if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '90d' });
+  res.json({
+    token,
+    user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar, targetSavingsRate: user.targetSavingsRate, monthlyIncomeGoal: user.monthlyIncomeGoal },
+  });
+});
+
+app.get('/auth/me', requireAuth, (req, res) => {
+  const users = loadUsers();
+  const user = users.find(u => u.id === req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ id: user.id, email: user.email, name: user.name, avatar: user.avatar, targetSavingsRate: user.targetSavingsRate, monthlyIncomeGoal: user.monthlyIncomeGoal });
+});
+
+app.put('/auth/profile', requireAuth, (req, res) => {
+  const { name, avatar, targetSavingsRate, monthlyIncomeGoal } = req.body;
+  const users = loadUsers();
+  const idx = users.findIndex(u => u.id === req.userId);
+  if (idx < 0) return res.status(404).json({ error: 'User not found' });
+
+  if (name !== undefined) users[idx].name = name;
+  if (avatar !== undefined) users[idx].avatar = avatar;
+  if (targetSavingsRate !== undefined) users[idx].targetSavingsRate = parseFloat(targetSavingsRate) || 20;
+  if (monthlyIncomeGoal !== undefined) users[idx].monthlyIncomeGoal = parseFloat(monthlyIncomeGoal) || 0;
+
+  saveUsers(users);
+  const u = users[idx];
+  res.json({ id: u.id, email: u.email, name: u.name, avatar: u.avatar, targetSavingsRate: u.targetSavingsRate, monthlyIncomeGoal: u.monthlyIncomeGoal });
+});
+
 // Transactions
-app.get('/api/transactions', (req, res) => {
-  const data = load();
+app.get('/api/transactions', requireAuth, (req, res) => {
+  const data = load(req.userId);
   let txs = data.transactions.slice().reverse();
   if (req.query.month) {
     const { year, month } = parseMonth(req.query.month);
@@ -221,10 +327,10 @@ app.get('/api/transactions', (req, res) => {
   res.json(txs);
 });
 
-app.post('/api/transactions', (req, res) => {
+app.post('/api/transactions', requireAuth, (req, res) => {
   const { type, amount, category, description, recurring } = req.body;
   if (!type || !amount || !category) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const tx = {
     id: Date.now().toString(),
     type,
@@ -235,82 +341,82 @@ app.post('/api/transactions', (req, res) => {
     date: new Date().toISOString(),
   };
   data.transactions.push(tx);
-  save(data);
+  save(data, req.userId);
   res.json(tx);
 });
 
-app.delete('/api/transactions/:id', (req, res) => {
-  const data = load();
+app.delete('/api/transactions/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.transactions = data.transactions.filter(t => t.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Budgets
-app.get('/api/budgets', (req, res) => {
-  res.json(load().budgets);
+app.get('/api/budgets', requireAuth, (req, res) => {
+  res.json(load(req.userId).budgets);
 });
 
-app.post('/api/budgets', (req, res) => {
+app.post('/api/budgets', requireAuth, (req, res) => {
   const { category, limit } = req.body;
   if (!category || !limit) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const existing = data.budgets.findIndex(b => b.category === category);
   if (existing >= 0) {
     data.budgets[existing].limit = parseFloat(limit);
   } else {
     data.budgets.push({ category, limit: parseFloat(limit) });
   }
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
-app.delete('/api/budgets/:category', (req, res) => {
-  const data = load();
+app.delete('/api/budgets/:category', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.budgets = data.budgets.filter(b => b.category !== decodeURIComponent(req.params.category));
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Goals
-app.get('/api/goals', (req, res) => {
-  res.json(load().goals);
+app.get('/api/goals', requireAuth, (req, res) => {
+  res.json(load(req.userId).goals);
 });
 
-app.post('/api/goals', (req, res) => {
+app.post('/api/goals', requireAuth, (req, res) => {
   const { name, target } = req.body;
   if (!name || !target) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const goal = { id: Date.now().toString(), name, target: parseFloat(target), current: 0, deposits: [] };
   data.goals.push(goal);
-  save(data);
+  save(data, req.userId);
   res.json(goal);
 });
 
-app.post('/api/goals/:id/deposit', (req, res) => {
+app.post('/api/goals/:id/deposit', requireAuth, (req, res) => {
   const { amount } = req.body;
   if (!amount) return res.status(400).json({ error: 'Missing amount' });
-  const data = load();
+  const data = load(req.userId);
   const goal = data.goals.find(g => g.id === req.params.id);
   if (!goal) return res.status(404).json({ error: 'Not found' });
   const deposit = parseFloat(amount);
   goal.current = Math.min(goal.current + deposit, goal.target);
   if (!goal.deposits) goal.deposits = [];
   goal.deposits.push({ amount: deposit, date: new Date().toISOString() });
-  save(data);
+  save(data, req.userId);
   res.json(goal);
 });
 
-app.delete('/api/goals/:id', (req, res) => {
-  const data = load();
+app.delete('/api/goals/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.goals = data.goals.filter(g => g.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Months with data
-app.get('/api/months', (req, res) => {
-  const data = load();
+app.get('/api/months', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const months = new Set();
   data.transactions.forEach(t => {
     const d = new Date(t.date);
@@ -322,8 +428,8 @@ app.get('/api/months', (req, res) => {
 });
 
 // Overview stats
-app.get('/api/overview', (req, res) => {
-  const data = load();
+app.get('/api/overview', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const { year, month } = parseMonth(req.query.month);
 
   const thisMonth = filterByMonth(data.transactions, year, month);
@@ -356,8 +462,8 @@ app.get('/api/overview', (req, res) => {
 });
 
 // AI Insights
-app.post('/api/insights', async (req, res) => {
-  const data = load();
+app.post('/api/insights', requireAuth, async (req, res) => {
+  const data = load(req.userId);
   const system = buildSystem(data, req.body.month);
   try {
     const msg = await client.messages.create({
@@ -372,9 +478,26 @@ app.post('/api/insights', async (req, res) => {
   }
 });
 
-// CSV Export
+// CSV Export — accepts token via query param as alternative to header
 app.get('/api/export', (req, res) => {
-  const data = load();
+  // Try Authorization header first, then query token
+  let userId = null;
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(header.slice(7), JWT_SECRET);
+      userId = payload.userId;
+    } catch {}
+  }
+  if (!userId && req.query.token) {
+    try {
+      const payload = jwt.verify(req.query.token, JWT_SECRET);
+      userId = payload.userId;
+    } catch {}
+  }
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const data = load(userId);
   let txs = data.transactions;
   if (req.query.month) {
     const { year, month } = parseMonth(req.query.month);
@@ -397,11 +520,11 @@ app.get('/api/export', (req, res) => {
 });
 
 // Chat
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireAuth, async (req, res) => {
   const { message, month } = req.body;
   if (!message) return res.status(400).json({ error: 'No message' });
 
-  const data = load();
+  const data = load(req.userId);
   data.messages.push({ role: 'user', content: message });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -442,7 +565,7 @@ app.post('/api/chat', async (req, res) => {
 
     const cleanFull = stripMarkdown(full);
     data.messages.push({ role: 'assistant', content: cleanFull });
-    save(data);
+    save(data, req.userId);
     send({ type: 'done' });
     res.end();
   } catch (err) {
@@ -453,15 +576,15 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // ── Recurring transactions ──
-app.get('/api/recurring', (req, res) => {
-  const data = load();
+app.get('/api/recurring', requireAuth, (req, res) => {
+  const data = load(req.userId);
   res.json({ recurring: data.recurring, due: getDueRecurring(data) });
 });
 
-app.post('/api/recurring', (req, res) => {
+app.post('/api/recurring', requireAuth, (req, res) => {
   const { type, amount, category, description, frequency, startDate } = req.body;
   if (!type || !amount || !category || !frequency) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const item = {
     id: Date.now().toString(),
     type, amount: parseFloat(amount), category,
@@ -469,21 +592,21 @@ app.post('/api/recurring', (req, res) => {
     nextDate: startDate || new Date().toISOString().split('T')[0],
   };
   data.recurring.push(item);
-  save(data);
+  save(data, req.userId);
   res.json(item);
 });
 
-app.delete('/api/recurring/:id', (req, res) => {
-  const data = load();
+app.delete('/api/recurring/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.recurring = data.recurring.filter(r => r.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // Log all due recurring items as real transactions
-app.post('/api/recurring/log', (req, res) => {
+app.post('/api/recurring/log', requireAuth, (req, res) => {
   const { ids } = req.body;
-  const data = load();
+  const data = load(req.userId);
   const today = new Date().toISOString().split('T')[0];
   const toLog = ids
     ? data.recurring.filter(r => ids.includes(r.id))
@@ -501,13 +624,13 @@ app.post('/api/recurring/log', (req, res) => {
     logged.push(tx);
     advanceNextDate(rec);
   });
-  save(data);
+  save(data, req.userId);
   res.json({ logged, due: getDueRecurring(data) });
 });
 
 // ── Monthly trends (last 6 months) ──
-app.get('/api/trends', (req, res) => {
-  const data = load();
+app.get('/api/trends', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const months = [];
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
@@ -530,8 +653,8 @@ app.get('/api/trends', (req, res) => {
 });
 
 // ── Upcoming bills (recurring expenses in next 14 days) ──
-app.get('/api/upcoming', (req, res) => {
-  const data = load();
+app.get('/api/upcoming', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 14);
   const upcoming = data.recurring
@@ -546,8 +669,8 @@ app.get('/api/upcoming', (req, res) => {
 });
 
 // ── Budget alerts ──
-app.get('/api/alerts', (req, res) => {
-  const data = load();
+app.get('/api/alerts', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const now = new Date();
   const txs = data.transactions.filter(t => {
     const d = new Date(t.date);
@@ -568,7 +691,7 @@ app.get('/api/alerts', (req, res) => {
 });
 
 // ── Analyze check/receipt photo ──
-app.post('/api/analyze-check', async (req, res) => {
+app.post('/api/analyze-check', requireAuth, async (req, res) => {
   const { image, mediaType } = req.body;
   if (!image) return res.status(400).json({ error: 'No image' });
   try {
@@ -593,8 +716,8 @@ app.post('/api/analyze-check', async (req, res) => {
 });
 
 // ── Subscriptions ──
-app.get('/api/subscriptions', (req, res) => {
-  const data = load();
+app.get('/api/subscriptions', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const subs = data.subscriptions;
   const monthlyTotal = subs
     .filter(s => s.active !== false)
@@ -602,10 +725,10 @@ app.get('/api/subscriptions', (req, res) => {
   res.json({ subscriptions: subs, monthlyTotal });
 });
 
-app.post('/api/subscriptions', (req, res) => {
+app.post('/api/subscriptions', requireAuth, (req, res) => {
   const { name, amount, cycle, nextBilling, category } = req.body;
   if (!name || !amount) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const sub = {
     id: Date.now().toString(),
     name, amount: parseFloat(amount),
@@ -615,70 +738,70 @@ app.post('/api/subscriptions', (req, res) => {
     active: true,
   };
   data.subscriptions.push(sub);
-  save(data);
+  save(data, req.userId);
   res.json(sub);
 });
 
-app.delete('/api/subscriptions/:id', (req, res) => {
-  const data = load();
+app.delete('/api/subscriptions/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.subscriptions = data.subscriptions.filter(s => s.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
-app.post('/api/subscriptions/:id/cancel', (req, res) => {
-  const data = load();
+app.post('/api/subscriptions/:id/cancel', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const sub = data.subscriptions.find(s => s.id === req.params.id);
   if (sub) sub.active = false;
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // ── Net worth ──
-app.get('/api/networth', (req, res) => {
-  const data = load();
+app.get('/api/networth', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const totalAssets = data.assets.reduce((s, a) => s + a.value, 0);
   const totalLiabilities = data.liabilities.reduce((s, l) => s + l.balance, 0);
   res.json({ assets: data.assets, liabilities: data.liabilities, totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities });
 });
 
-app.post('/api/assets', (req, res) => {
+app.post('/api/assets', requireAuth, (req, res) => {
   const { name, type, value } = req.body;
   if (!name || !value) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const asset = { id: Date.now().toString(), name, type: type || 'liquid', value: parseFloat(value) };
   data.assets.push(asset);
-  save(data);
+  save(data, req.userId);
   res.json(asset);
 });
 
-app.delete('/api/assets/:id', (req, res) => {
-  const data = load();
+app.delete('/api/assets/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.assets = data.assets.filter(a => a.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
-app.post('/api/liabilities', (req, res) => {
+app.post('/api/liabilities', requireAuth, (req, res) => {
   const { name, balance, interestRate, minPayment } = req.body;
   if (!name || !balance) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const liability = { id: Date.now().toString(), name, balance: parseFloat(balance), interestRate: parseFloat(interestRate) || 0, minPayment: parseFloat(minPayment) || 0 };
   data.liabilities.push(liability);
-  save(data);
+  save(data, req.userId);
   res.json(liability);
 });
 
-app.delete('/api/liabilities/:id', (req, res) => {
-  const data = load();
+app.delete('/api/liabilities/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.liabilities = data.liabilities.filter(l => l.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // ── Financial health score ──
-app.get('/api/score', (req, res) => {
-  const data = load();
+app.get('/api/score', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const now = new Date();
   const thisMonth = data.transactions.filter(t => {
     const d = new Date(t.date);
@@ -748,8 +871,8 @@ app.get('/api/score', (req, res) => {
 });
 
 // ── Cash flow forecast ──
-app.get('/api/forecast', (req, res) => {
-  const data = load();
+app.get('/api/forecast', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let balance = data.currentBalance ?? 0;
 
@@ -777,17 +900,17 @@ app.get('/api/forecast', (req, res) => {
   res.json({ currentBalance: balance, events: events.slice(0, 20), checkpoints });
 });
 
-app.post('/api/forecast/balance', (req, res) => {
+app.post('/api/forecast/balance', requireAuth, (req, res) => {
   const { balance } = req.body;
-  const data = load();
+  const data = load(req.userId);
   data.currentBalance = parseFloat(balance) || 0;
-  save(data);
+  save(data, req.userId);
   res.json({ currentBalance: data.currentBalance });
 });
 
 // Paydays
-app.get('/api/paydays', (req, res) => {
-  const data = load();
+app.get('/api/paydays', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const schedule = data.paydaySchedule;
   const { year, month } = parseMonth(req.query.month);
   const days = getPaydaysForMonth(schedule, year, month);
@@ -795,27 +918,27 @@ app.get('/api/paydays', (req, res) => {
   res.json({ schedule, days, next });
 });
 
-app.post('/api/paydays', (req, res) => {
+app.post('/api/paydays', requireAuth, (req, res) => {
   const { schedule } = req.body;
-  const data = load();
+  const data = load(req.userId);
   data.paydaySchedule = schedule;
-  save(data);
+  save(data, req.userId);
   const { year, month } = parseMonth(req.query.month);
   const days = getPaydaysForMonth(schedule, year, month);
   const next = getNextPayday(schedule);
   res.json({ schedule, days, next });
 });
 
-app.post('/api/paydays/toggle', (req, res) => {
+app.post('/api/paydays/toggle', requireAuth, (req, res) => {
   const { date } = req.body;
   if (!date) return res.status(400).json({ error: 'Missing date' });
-  const data = load();
+  const data = load(req.userId);
   if (!data.paydaySchedule) data.paydaySchedule = { type: 'custom', customDates: [] };
   if (!data.paydaySchedule.customDates) data.paydaySchedule.customDates = [];
   const idx = data.paydaySchedule.customDates.indexOf(date);
   if (idx >= 0) data.paydaySchedule.customDates.splice(idx, 1);
   else data.paydaySchedule.customDates.push(date);
-  save(data);
+  save(data, req.userId);
   const d = new Date(date + 'T00:00:00');
   const days = getPaydaysForMonth(data.paydaySchedule, d.getFullYear(), d.getMonth());
   const next = getNextPayday(data.paydaySchedule);
@@ -823,8 +946,8 @@ app.post('/api/paydays/toggle', (req, res) => {
 });
 
 // ── Feature 1: Emergency Fund Tracker ──
-app.get('/api/emergency', (req, res) => {
-  const data = load();
+app.get('/api/emergency', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const now = new Date();
   // Get last 3 full months of expenses
   let totalExpenses = 0;
@@ -852,8 +975,8 @@ app.get('/api/emergency', (req, res) => {
 });
 
 // ── Feature 2: Spending Anomaly Alerts ──
-app.get('/api/anomalies', (req, res) => {
-  const data = load();
+app.get('/api/anomalies', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const now = new Date();
   // Current month spend by category
   const curTxs = filterByMonth(data.transactions, now.getFullYear(), now.getMonth());
@@ -876,8 +999,6 @@ app.get('/api/anomalies', (req, res) => {
   // Compute averages
   const avgByCategory = {};
   for (const [cat, amounts] of Object.entries(histByCategory)) {
-    // Sum amounts across the 3 months (not just the array items)
-    // We need monthly totals, so re-aggregate
     avgByCategory[cat] = 0;
   }
   // Redo: collect monthly totals per category
@@ -900,7 +1021,7 @@ app.get('/api/anomalies', (req, res) => {
     if (currentSpend <= 50) continue;
     const monthlyTotals = histMonthlyTotals[cat] || [];
     if (!monthlyTotals.length) continue;
-    const avgSpend = monthlyTotals.reduce((s, v) => s + v, 0) / 3; // divide by 3, not months with data
+    const avgSpend = monthlyTotals.reduce((s, v) => s + v, 0) / 3;
     if (currentSpend > avgSpend * 1.5) {
       const pctAbove = Math.round(((currentSpend - avgSpend) / avgSpend) * 100);
       anomalies.push({ category: cat, currentSpend, avgSpend, pctAbove });
@@ -912,8 +1033,8 @@ app.get('/api/anomalies', (req, res) => {
 });
 
 // ── Feature 3: Financial Freedom Date ──
-app.get('/api/freedom', (req, res) => {
-  const data = load();
+app.get('/api/freedom', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const now = new Date();
 
   // Net worth
@@ -956,46 +1077,46 @@ app.get('/api/freedom', (req, res) => {
   });
 });
 
-app.post('/api/freedom/target', (req, res) => {
+app.post('/api/freedom/target', requireAuth, (req, res) => {
   const { targetAnnualSpend } = req.body;
-  const data = load();
+  const data = load(req.userId);
   data.freedomTarget = parseFloat(targetAnnualSpend) || null;
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true, freedomTarget: data.freedomTarget });
 });
 
 // ── Feature 4: Credit Score Log ──
-app.get('/api/creditscore', (req, res) => {
-  const data = load();
+app.get('/api/creditscore', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const scores = [...data.creditScores].sort((a, b) => b.date.localeCompare(a.date));
   res.json(scores);
 });
 
-app.post('/api/creditscore', (req, res) => {
+app.post('/api/creditscore', requireAuth, (req, res) => {
   const { score, date } = req.body;
   if (!score) return res.status(400).json({ error: 'Missing score' });
-  const data = load();
+  const data = load(req.userId);
   const entry = {
     id: Date.now().toString(),
     score: parseInt(score),
     date: date || new Date().toISOString().split('T')[0],
   };
   data.creditScores.push(entry);
-  save(data);
+  save(data, req.userId);
   res.json(entry);
 });
 
-app.delete('/api/creditscore/:id', (req, res) => {
-  const data = load();
+app.delete('/api/creditscore/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.creditScores = data.creditScores.filter(c => c.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
 // ── Feature 5: Tax Estimator ──
-app.get('/api/tax', (req, res) => {
+app.get('/api/tax', requireAuth, (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
-  const data = load();
+  const data = load(req.userId);
 
   const yearTxs = data.transactions.filter(t => {
     const d = new Date(t.date);
@@ -1048,9 +1169,9 @@ app.get('/api/tax', (req, res) => {
 });
 
 // ── Feature 6: Weekly Digest ──
-app.post('/api/digest', async (req, res) => {
+app.post('/api/digest', requireAuth, async (req, res) => {
   const { month } = req.body;
-  const data = load();
+  const data = load(req.userId);
   const { year, mo } = (() => {
     const { year, month: m } = parseMonth(month);
     return { year, mo: m };
@@ -1069,7 +1190,6 @@ app.post('/api/digest', async (req, res) => {
   });
   const top3 = Object.entries(byCategory).sort(([, a], [, b]) => b - a).slice(0, 3).map(([cat, amt]) => `${cat}: $${amt.toFixed(0)}`).join(', ');
 
-  const now = new Date();
   const budgetAlerts = data.budgets.filter(b => (byCategory[b.category] || 0) >= b.limit * 0.8).map(b => b.category).join(', ');
 
   const prompt = `Here's my financial snapshot for ${monthLabel}:
@@ -1096,24 +1216,24 @@ Write a friendly, direct 3-4 sentence financial digest for the week. Be encourag
 });
 
 // ── Feature 7: Savings Challenges ──
-app.get('/api/challenges', (req, res) => {
-  const data = load();
+app.get('/api/challenges', requireAuth, (req, res) => {
+  const data = load(req.userId);
   res.json(data.challenges || {});
 });
 
-app.post('/api/challenges/52week', (req, res) => {
+app.post('/api/challenges/52week', requireAuth, (req, res) => {
   const { week, completed } = req.body;
   if (!week || week < 1 || week > 52) return res.status(400).json({ error: 'Invalid week' });
-  const data = load();
+  const data = load(req.userId);
   if (!data.challenges) data.challenges = {};
   if (!data.challenges.weeks52) data.challenges.weeks52 = {};
   data.challenges.weeks52[String(week)] = !!completed;
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true, weeks52: data.challenges.weeks52 });
 });
 
-app.get('/api/challenges/roundup', (req, res) => {
-  const data = load();
+app.get('/api/challenges/roundup', requireAuth, (req, res) => {
+  const data = load(req.userId);
   let roundupTotal = 0;
   data.transactions.filter(t => t.type === 'expense').forEach(t => {
     const ceil = Math.ceil(t.amount);
@@ -1122,8 +1242,8 @@ app.get('/api/challenges/roundup', (req, res) => {
   res.json({ roundupTotal: parseFloat(roundupTotal.toFixed(2)) });
 });
 
-app.get('/api/challenges/nospend', (req, res) => {
-  const data = load();
+app.get('/api/challenges/nospend', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -1146,8 +1266,8 @@ app.get('/api/challenges/nospend', (req, res) => {
 });
 
 // ── Feature 8: Milestones & Badges ──
-app.get('/api/milestones', (req, res) => {
-  const data = load();
+app.get('/api/milestones', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const now = new Date();
   const badges = [];
 
@@ -1163,13 +1283,9 @@ app.get('/api/milestones', (req, res) => {
     { id: 'debt_free', label: 'Debt Free', emoji: '✨', description: 'No liabilities — completely debt free' },
   ];
 
-  // first_tx
   if (data.transactions.length > 0) badges.push('first_tx');
-
-  // first_budget
   if (data.budgets.length > 0) badges.push('first_budget');
 
-  // saver_1k and saver_rate_20 — check all months
   const monthsSet = new Set();
   data.transactions.forEach(t => {
     const d = new Date(t.date);
@@ -1188,10 +1304,8 @@ app.get('/api/milestones', (req, res) => {
   if (hasSaver1k) badges.push('saver_1k');
   if (hasSaverRate20) badges.push('saver_rate_20');
 
-  // streak_3 — last 6 months
-  let consecutivePositive = 0;
-  let maxConsecutive = 0;
   let cur = 0;
+  let maxConsecutive = 0;
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const txs = filterByMonth(data.transactions, d.getFullYear(), d.getMonth());
@@ -1202,7 +1316,6 @@ app.get('/api/milestones', (req, res) => {
   }
   if (maxConsecutive >= 3) badges.push('streak_3');
 
-  // emergency_3mo
   let totalExp3 = 0;
   for (let i = 1; i <= 3; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -1213,13 +1326,8 @@ app.get('/api/milestones', (req, res) => {
   const cb = data.currentBalance || 0;
   if (avgExp > 0 && cb / avgExp >= 3) badges.push('emergency_3mo');
 
-  // goal_complete
   if (data.goals.some(g => g.current >= g.target)) badges.push('goal_complete');
-
-  // sub_tracker
   if (data.subscriptions.length > 0) badges.push('sub_tracker');
-
-  // debt_free
   if (data.liabilities.length === 0) badges.push('debt_free');
 
   const earned = badges.map(id => BADGE_DEFS.find(b => b.id === id)).filter(Boolean);
@@ -1227,16 +1335,16 @@ app.get('/api/milestones', (req, res) => {
 });
 
 // ── Feature 9: Shared Expenses ──
-app.get('/api/shared', (req, res) => {
-  const data = load();
+app.get('/api/shared', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const sorted = [...data.shared].sort((a, b) => b.date.localeCompare(a.date));
   res.json(sorted);
 });
 
-app.post('/api/shared', (req, res) => {
+app.post('/api/shared', requireAuth, (req, res) => {
   const { person, amount, description, date, paidBy } = req.body;
   if (!person || !amount) return res.status(400).json({ error: 'Missing fields' });
-  const data = load();
+  const data = load(req.userId);
   const entry = {
     id: Date.now().toString(),
     person,
@@ -1247,23 +1355,23 @@ app.post('/api/shared', (req, res) => {
     settled: false,
   };
   data.shared.push(entry);
-  save(data);
+  save(data, req.userId);
   res.json(entry);
 });
 
-app.post('/api/shared/:id/settle', (req, res) => {
-  const data = load();
+app.post('/api/shared/:id/settle', requireAuth, (req, res) => {
+  const data = load(req.userId);
   const entry = data.shared.find(s => s.id === req.params.id);
   if (!entry) return res.status(404).json({ error: 'Not found' });
   entry.settled = !entry.settled;
-  save(data);
+  save(data, req.userId);
   res.json(entry);
 });
 
-app.delete('/api/shared/:id', (req, res) => {
-  const data = load();
+app.delete('/api/shared/:id', requireAuth, (req, res) => {
+  const data = load(req.userId);
   data.shared = data.shared.filter(s => s.id !== req.params.id);
-  save(data);
+  save(data, req.userId);
   res.json({ ok: true });
 });
 
