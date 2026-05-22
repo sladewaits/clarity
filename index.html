@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Clarity</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Clarity" />
+  <meta name="theme-color" content="#22c55e" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <span class="logo">Clarity</span>
+      <span class="logo-tag">finance tracker</span>
+    </div>
+  </header>
+
+  <!-- Tab bar -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="overview">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </button>
+    <button class="tab" data-tab="transactions">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Transactions
+    </button>
+    <button class="tab" data-tab="plan">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Plan
+    </button>
+    <button class="tab" data-tab="calendar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Calendar
+    </button>
+    <button class="tab" data-tab="chat">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat
+    </button>
+  </nav>
+
+  <!-- ── Overview tab ── -->
+  <div class="tab-panel active" id="tab-overview">
+
+    <!-- Health score -->
+    <div class="score-card" id="scoreCard">
+      <div class="score-left">
+        <div class="score-number" id="scoreNumber">—</div>
+        <div class="score-label">Financial health</div>
+      </div>
+      <div class="score-grade" id="scoreGrade">—</div>
+      <div class="score-bars" id="scoreBars"></div>
+    </div>
+
+    <!-- Summary card -->
+    <div class="summary-card">
+      <div class="summary-month-nav">
+        <button class="month-arrow" id="prevMonth">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="month-label" id="monthLabel">May 2026</span>
+        <button class="month-arrow" id="nextMonth">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="summary-net" id="overviewNet">$0.00</div>
+      <div class="summary-net-sub">
+        <span class="summary-net-label">net this month</span>
+        <span class="overview-vs" id="overviewVs" style="display:none"></span>
+      </div>
+
+      <div class="summary-divider"></div>
+
+      <div class="summary-stats">
+        <div class="summary-stat">
+          <div class="summary-stat-val summary-stat-val--income" id="overviewIncome">$0</div>
+          <div class="summary-stat-key">income</div>
+        </div>
+        <div class="summary-stat-sep"></div>
+        <div class="summary-stat">
+          <div class="summary-stat-val summary-stat-val--expense" id="overviewExpenses">$0</div>
+          <div class="summary-stat-key">expenses</div>
+        </div>
+        <div class="summary-stat-sep"></div>
+        <div class="summary-stat">
+          <div class="summary-stat-val" id="overviewRate">—</div>
+          <div class="summary-stat-key">saved</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Savings card -->
+    <div class="ov-card savings-card" id="savingsCard">
+      <div class="savings-header">
+        <span class="ov-card-title" style="margin-bottom:0">Savings</span>
+        <span class="savings-streak-badge" id="savingsStreak" style="display:none"></span>
+      </div>
+      <div class="savings-stats-row">
+        <div class="savings-stat-block">
+          <div class="savings-amt" id="savingsAmt">—</div>
+          <div class="savings-stat-sub" id="savingsAmtLabel">saved this month</div>
+        </div>
+        <div class="savings-stat-block savings-stat-block--right">
+          <div class="savings-rate-pct" id="savingsRatePct">—</div>
+          <div class="savings-stat-sub">savings rate</div>
+        </div>
+      </div>
+      <div class="savings-bar-section">
+        <div class="savings-bar-track">
+          <div class="savings-bar-fill" id="savingsRateFill" style="width:0%"></div>
+          <div class="savings-bar-target"></div>
+        </div>
+        <div class="savings-bar-label">target 20%</div>
+      </div>
+      <div class="savings-footer">
+        <div class="savings-footer-item">
+          <div class="savings-footer-val" id="savingsAvg">—</div>
+          <div class="savings-footer-key">avg / month</div>
+        </div>
+        <div class="savings-footer-sep"></div>
+        <div class="savings-footer-item">
+          <div class="savings-footer-val" id="savingsProjected">—</div>
+          <div class="savings-footer-key">est. annual</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Budget alerts -->
+    <div id="alertsBlock"></div>
+
+    <!-- Insight strip -->
+    <div class="insight-strip">
+      <span class="insight-strip-badge">Clarity</span>
+      <span class="insight-strip-text" id="insightText">Analyzing your finances...</span>
+    </div>
+
+    <!-- Milestones badge strip (Feature 8) -->
+    <div id="milestonesStrip" style="display:none">
+      <div class="milestones-strip-inner" id="milestonesInner"></div>
+    </div>
+
+    <!-- Upcoming bills -->
+    <div class="ov-card" id="upcomingCard" style="display:none">
+      <div class="ov-card-title">Upcoming bills</div>
+      <div class="upcoming-list" id="upcomingList"></div>
+    </div>
+
+    <!-- Trends card -->
+    <div class="ov-card" id="trendsCard">
+      <div class="ov-card-title-row">
+        <span class="ov-card-title">6-month trend</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="trends-legend">
+            <span class="trends-legend-item trends-legend-income">Income</span>
+            <span class="trends-legend-item trends-legend-expense">Expenses</span>
+          </div>
+          <button class="forecast-set-btn" id="digestBtn">Weekly digest</button>
+        </div>
+      </div>
+      <div id="trendsChart"><div class="empty-state" style="padding:12px 0">No history yet.</div></div>
+      <div id="digestArea" style="display:none">
+        <div class="digest-content" id="digestContent"></div>
+      </div>
+    </div>
+
+    <!-- Financial Freedom card (Feature 3) -->
+    <div class="ov-card" id="freedomCard">
+      <div class="ov-card-title-row">
+        <span class="ov-card-title">Financial Freedom</span>
+        <button class="forecast-set-btn" id="freedomChangeBtn" style="display:none">Change target</button>
+      </div>
+      <div id="freedomSetArea">
+        <div class="freedom-empty-hint">Set your target annual spend to see your FI date.</div>
+        <div class="forecast-input-row" style="margin-top:10px">
+          <input class="form-input" id="freedomTargetInput" type="number" placeholder="Annual spend ($)" style="margin-bottom:0" />
+          <button class="primary-btn" id="freedomSaveBtn" style="width:auto;padding:10px 16px">Save</button>
+        </div>
+      </div>
+      <div id="freedomResult" style="display:none">
+        <div class="freedom-fi-row">
+          <div class="freedom-fi-num" id="freedomFiNum">—</div>
+          <div class="freedom-fi-label">FI number</div>
+        </div>
+        <div class="progress-bar" style="margin:10px 0 4px">
+          <div class="progress-fill" id="freedomProgressFill" style="width:0%"></div>
+        </div>
+        <div class="freedom-progress-labels">
+          <span id="freedomNetWorthLabel">Net worth: —</span>
+          <span id="freedomPctLabel">0%</span>
+        </div>
+        <div class="freedom-eta" id="freedomEta"></div>
+      </div>
+    </div>
+
+    <!-- Cash flow forecast -->
+    <div class="ov-card" id="forecastCard">
+      <div class="ov-card-title-row">
+        <span class="ov-card-title">Cash flow forecast</span>
+        <button class="forecast-set-btn" id="forecastSetBtn">Set balance</button>
+      </div>
+      <div id="forecastSetRow" style="display:none">
+        <div class="forecast-input-row">
+          <input class="form-input" id="forecastBalanceInput" type="number" placeholder="Current balance ($)" style="margin-bottom:8px" />
+          <button class="primary-btn" id="forecastSaveBtn" style="width:auto;padding:10px 16px">Save</button>
+        </div>
+      </div>
+      <div class="forecast-checkpoints" id="forecastCheckpoints">
+        <div class="empty-state" style="padding:12px 0">Set your current balance to see a forecast.</div>
+      </div>
+      <div class="forecast-events" id="forecastEvents"></div>
+    </div>
+
+    <!-- Spending card -->
+    <div class="ov-card">
+      <div class="ov-card-title">This month</div>
+      <div class="chart-block" id="chartBlock">
+        <div class="empty-state">No expenses logged yet.</div>
+      </div>
+    </div>
+
+    <!-- Budgets card -->
+    <div class="ov-card" id="budgetStatusCard" style="display:none">
+      <div class="ov-card-title">Budgets</div>
+      <div class="budget-status-list" id="budgetStatusList"></div>
+    </div>
+
+    <!-- Goals card -->
+    <div class="ov-card" id="goalsStatusCard" style="display:none">
+      <div class="ov-card-title">Goals</div>
+      <div class="goals-status-list" id="goalsStatusList"></div>
+    </div>
+
+    <!-- Emergency Fund card (Feature 1) -->
+    <div class="ov-card" id="emergencyCard">
+      <div class="ov-card-title">Emergency Fund</div>
+      <div id="emergencyContent"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Transactions tab ── -->
+  <div class="tab-panel" id="tab-transactions">
+
+    <div class="tab-header">
+      <div class="tab-header-row">
+        <div>
+          <h2 class="tab-title">Transactions</h2>
+          <p class="tab-sub">Log every dollar in and out.</p>
+        </div>
+        <button class="export-btn" id="exportBtn" title="Export CSV">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Due recurring items banner -->
+    <div class="due-banner" id="dueBanner" style="display:none">
+      <div class="due-banner-text" id="dueBannerText"></div>
+      <button class="due-banner-btn" id="dueBannerBtn">Log all</button>
+    </div>
+
+    <!-- Scan check -->
+    <div class="scan-row">
+      <button class="scan-btn" id="scanBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Scan check or receipt
+      </button>
+      <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" />
+      <span class="scan-status" id="scanStatus"></span>
+    </div>
+
+    <div class="tx-form card">
+      <div class="tx-type-row">
+        <button class="tx-type-btn active" id="txTypeIncome" data-type="income">Income</button>
+        <button class="tx-type-btn" id="txTypeExpense" data-type="expense">Expense</button>
+      </div>
+      <input class="form-input" id="txAmount" type="number" placeholder="Amount ($)" min="0" step="0.01" />
+      <select class="form-input form-select" id="txCategory">
+        <option value="" disabled selected>Category</option>
+        <optgroup label="Income">
+          <option value="Salary">Salary</option>
+          <option value="Freelance">Freelance</option>
+          <option value="Business">Business</option>
+          <option value="Investment">Investment</option>
+          <option value="Other income">Other income</option>
+        </optgroup>
+        <optgroup label="Expense">
+          <option value="Housing">Housing</option>
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Health">Health</option>
+          <option value="Subscriptions">Subscriptions</option>
+          <option value="Other expense">Other expense</option>
+        </optgroup>
+      </select>
+      <input class="form-input" id="txDesc" type="text" placeholder="Description (optional)" autocomplete="off" />
+      <label class="recurring-label">
+        <input type="checkbox" id="txRecurring" />
+        Mark as recurring
+      </label>
+      <button class="primary-btn" id="txSubmitBtn">Add transaction</button>
+    </div>
+
+    <div class="section-label">History</div>
+    <div class="tx-list" id="txList">
+      <div class="empty-state">No transactions yet.</div>
+    </div>
+
+    <div class="section-label">Recurring</div>
+    <div class="recurring-form card">
+      <div class="tx-type-row">
+        <button class="tx-type-btn active" id="recTypeIncome" data-type="income">Income</button>
+        <button class="tx-type-btn" id="recTypeExpense" data-type="expense">Expense</button>
+      </div>
+      <input class="form-input" id="recAmount" type="number" placeholder="Amount ($)" min="0" step="0.01" />
+      <select class="form-input form-select" id="recCategory">
+        <option value="" disabled selected>Category</option>
+        <optgroup label="Income">
+          <option value="Salary">Salary</option>
+          <option value="Freelance">Freelance</option>
+          <option value="Business">Business</option>
+          <option value="Investment">Investment</option>
+          <option value="Other income">Other income</option>
+        </optgroup>
+        <optgroup label="Expense">
+          <option value="Housing">Housing</option>
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Health">Health</option>
+          <option value="Subscriptions">Subscriptions</option>
+          <option value="Other expense">Other expense</option>
+        </optgroup>
+      </select>
+      <input class="form-input" id="recDesc" type="text" placeholder="Name (e.g. Netflix, Rent)" autocomplete="off" />
+      <select class="form-input form-select" id="recFrequency">
+        <option value="" disabled selected>How often?</option>
+        <option value="weekly">Every week</option>
+        <option value="biweekly">Every two weeks</option>
+        <option value="monthly">Every month</option>
+        <option value="yearly">Every year</option>
+      </select>
+      <input class="form-input" id="recStartDate" type="date" />
+      <button class="primary-btn" id="recSubmitBtn">Add recurring</button>
+    </div>
+    <div class="recurring-list" id="recurringList">
+      <div class="empty-state">No recurring items yet.</div>
+    </div>
+
+  </div>
+
+  <!-- ── Plan tab ── -->
+  <div class="tab-panel" id="tab-plan">
+
+    <div class="tab-header">
+      <h2 class="tab-title">Plan</h2>
+      <p class="tab-sub">Spending limits and savings targets.</p>
+    </div>
+
+    <!-- Segment control (now 9 segments, scrollable) -->
+    <div class="plan-segments">
+      <button class="plan-seg active" data-seg="budgets">Budgets</button>
+      <button class="plan-seg" data-seg="goals">Goals</button>
+      <button class="plan-seg" data-seg="subscriptions">Subscriptions</button>
+      <button class="plan-seg" data-seg="networth">Net Worth</button>
+      <button class="plan-seg" data-seg="debt">Debt</button>
+      <button class="plan-seg" data-seg="credit">Credit</button>
+      <button class="plan-seg" data-seg="tax">Tax</button>
+      <button class="plan-seg" data-seg="challenges">Challenges</button>
+      <button class="plan-seg" data-seg="shared">Shared</button>
+    </div>
+
+    <!-- Budgets section -->
+    <div class="plan-section" id="planBudgets">
+      <div class="plan-section-sub">Monthly limits by spending category.</div>
+
+      <div class="card" style="margin-top:14px">
+        <select class="form-input form-select" id="budgetCategory">
+          <option value="" disabled selected>Category</option>
+          <option value="Housing">Housing</option>
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Health">Health</option>
+          <option value="Subscriptions">Subscriptions</option>
+          <option value="Other expense">Other expense</option>
+        </select>
+        <input class="form-input" id="budgetLimit" type="number" placeholder="Monthly limit ($)" min="0" step="1" />
+        <button class="primary-btn" id="budgetBtn">Set budget</button>
+      </div>
+
+      <div class="section-label">Your budgets</div>
+      <div class="budget-list" id="budgetList">
+        <div class="empty-state">No budgets set yet.</div>
+      </div>
+    </div>
+
+    <!-- Goals section -->
+    <div class="plan-section" id="planGoals" style="display:none">
+      <div class="plan-section-sub">Set a target amount and track your progress.</div>
+
+      <div class="card" style="margin-top:14px">
+        <input class="form-input" id="goalName" type="text" placeholder="Goal name (e.g. Emergency fund)" autocomplete="off" />
+        <input class="form-input" id="goalTarget" type="number" placeholder="Target amount ($)" min="0" step="1" />
+        <button class="primary-btn" id="goalBtn">Create goal</button>
+      </div>
+
+      <div class="section-label">Your goals</div>
+      <div class="goals-list" id="goalsList">
+        <div class="empty-state">No goals yet.</div>
+      </div>
+    </div>
+
+    <!-- Subscriptions section -->
+    <div class="plan-section" id="planSubscriptions" style="display:none">
+      <div class="plan-section-sub">Track recurring services and what they cost you.</div>
+
+      <div class="sub-summary" id="subSummary" style="display:none">
+        <div class="sub-summary-item">
+          <div class="sub-summary-val" id="subMonthlyTotal">$0</div>
+          <div class="sub-summary-key">per month</div>
+        </div>
+        <div class="sub-summary-sep"></div>
+        <div class="sub-summary-item">
+          <div class="sub-summary-val" id="subAnnualTotal">$0</div>
+          <div class="sub-summary-key">per year</div>
+        </div>
+      </div>
+
+      <div class="sub-quickpicks">
+        <span class="sub-quickpick-label">Quick add:</span>
+        <button class="sub-qp" data-name="Netflix" data-amount="15.49" data-cycle="monthly">Netflix</button>
+        <button class="sub-qp" data-name="Spotify" data-amount="10.99" data-cycle="monthly">Spotify</button>
+        <button class="sub-qp" data-name="Apple Music" data-amount="10.99" data-cycle="monthly">Apple Music</button>
+        <button class="sub-qp" data-name="Hulu" data-amount="7.99" data-cycle="monthly">Hulu</button>
+        <button class="sub-qp" data-name="Disney+" data-amount="7.99" data-cycle="monthly">Disney+</button>
+        <button class="sub-qp" data-name="YouTube Premium" data-amount="13.99" data-cycle="monthly">YouTube</button>
+        <button class="sub-qp" data-name="Amazon Prime" data-amount="14.99" data-cycle="monthly">Prime</button>
+        <button class="sub-qp" data-name="ChatGPT Plus" data-amount="20.00" data-cycle="monthly">ChatGPT</button>
+        <button class="sub-qp" data-name="iCloud+" data-amount="2.99" data-cycle="monthly">iCloud</button>
+        <button class="sub-qp" data-name="HBO Max" data-amount="9.99" data-cycle="monthly">Max</button>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <input class="form-input" id="subName" type="text" placeholder="Service name" autocomplete="off" />
+        <div class="sub-form-row">
+          <input class="form-input" id="subAmount" type="number" placeholder="Amount ($)" min="0" step="0.01" />
+          <select class="form-input form-select" id="subCycle">
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+        <label class="schedule-field-label" style="margin-top:0">Next billing date</label>
+        <input class="form-input" id="subNextBilling" type="date" />
+        <button class="primary-btn" id="subSubmitBtn">Add subscription</button>
+      </div>
+
+      <div class="section-label">Your subscriptions</div>
+      <div class="sub-list" id="subList">
+        <div class="empty-state">No subscriptions tracked yet.</div>
+      </div>
+    </div>
+
+    <!-- Net worth section -->
+    <div class="plan-section" id="planNetworth" style="display:none">
+      <div class="plan-section-sub">Assets minus liabilities = your real financial picture.</div>
+
+      <div class="nw-summary" id="nwSummary">
+        <div class="nw-summary-item">
+          <div class="nw-summary-val nw-assets-val" id="nwAssets">$0</div>
+          <div class="nw-summary-key">Assets</div>
+        </div>
+        <div class="nw-summary-sep"></div>
+        <div class="nw-summary-item">
+          <div class="nw-summary-val nw-liab-val" id="nwLiabilities">$0</div>
+          <div class="nw-summary-key">Liabilities</div>
+        </div>
+        <div class="nw-summary-sep"></div>
+        <div class="nw-summary-item">
+          <div class="nw-summary-val" id="nwNet">$0</div>
+          <div class="nw-summary-key">Net worth</div>
+        </div>
+      </div>
+
+      <div class="section-label">Assets</div>
+      <div class="card" style="margin-bottom:10px">
+        <input class="form-input" id="assetName" type="text" placeholder="Name (e.g. Savings account)" autocomplete="off" />
+        <select class="form-input form-select" id="assetType">
+          <option value="liquid">💵 Cash / Savings</option>
+          <option value="investment">📈 Investment / Retirement</option>
+          <option value="property">🏠 Property</option>
+          <option value="vehicle">🚗 Vehicle</option>
+          <option value="other">📦 Other</option>
+        </select>
+        <input class="form-input" id="assetValue" type="number" placeholder="Current value ($)" min="0" />
+        <button class="primary-btn" id="addAssetBtn">Add asset</button>
+      </div>
+      <div class="nw-list" id="assetList"><div class="empty-state">No assets added yet.</div></div>
+
+      <div class="section-label">Liabilities</div>
+      <div class="card" style="margin-bottom:10px">
+        <input class="form-input" id="liabName" type="text" placeholder="Name (e.g. Student loan)" autocomplete="off" />
+        <div class="sub-form-row">
+          <input class="form-input" id="liabBalance" type="number" placeholder="Balance ($)" min="0" />
+          <input class="form-input" id="liabRate" type="number" placeholder="Interest %" min="0" step="0.1" />
+        </div>
+        <input class="form-input" id="liabMinPayment" type="number" placeholder="Min monthly payment ($)" min="0" />
+        <button class="primary-btn" id="addLiabBtn">Add liability</button>
+      </div>
+      <div class="nw-list" id="liabList"><div class="empty-state">No liabilities added yet.</div></div>
+    </div>
+
+    <!-- Debt payoff section -->
+    <div class="plan-section" id="planDebt" style="display:none">
+      <div class="plan-section-sub">Find the fastest, cheapest path to debt-free.</div>
+
+      <div class="card" style="margin-top:14px">
+        <label class="schedule-field-label" style="margin-top:0">Extra monthly payment beyond minimums</label>
+        <div class="forecast-input-row">
+          <input class="form-input" id="debtExtraPayment" type="number" placeholder="e.g. 200" min="0" style="margin-bottom:0" />
+          <button class="primary-btn" id="debtCalcBtn" style="width:auto;padding:11px 16px">Calculate</button>
+        </div>
+      </div>
+
+      <div id="debtNoDebts" class="empty-state" style="display:none">Add liabilities in the Net Worth tab first.</div>
+      <div id="debtResults" style="display:none">
+        <div class="debt-strategies">
+          <div class="debt-strategy" id="debtAvalanche">
+            <div class="debt-strategy-name">🏔 Avalanche</div>
+            <div class="debt-strategy-sub">Highest interest first — saves the most money</div>
+            <div class="debt-strategy-stats" id="avalancheStats"></div>
+          </div>
+          <div class="debt-strategy" id="debtSnowball">
+            <div class="debt-strategy-name">⛄ Snowball</div>
+            <div class="debt-strategy-sub">Smallest balance first — quick psychological wins</div>
+            <div class="debt-strategy-stats" id="snowballStats"></div>
+          </div>
+        </div>
+        <div class="debt-order-label">Avalanche payoff order:</div>
+        <div id="debtOrderList"></div>
+      </div>
+    </div>
+
+    <!-- Credit Score section (Feature 4) -->
+    <div class="plan-section" id="planCredit" style="display:none">
+      <div class="plan-section-sub">Track your credit score over time.</div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="sub-form-row">
+          <input class="form-input" id="creditScoreInput" type="number" placeholder="Score (300-850)" min="300" max="850" style="margin-bottom:0" />
+          <input class="form-input" id="creditDateInput" type="date" style="margin-bottom:0" />
+        </div>
+        <button class="primary-btn" style="margin-top:10px" id="creditAddBtn">Add score</button>
+      </div>
+
+      <div id="creditLatest" style="display:none;margin-top:14px"></div>
+
+      <div class="section-label">Score history</div>
+      <div id="creditList"><div class="empty-state">No scores logged yet.</div></div>
+    </div>
+
+    <!-- Tax Estimator section (Feature 5) -->
+    <div class="plan-section" id="planTax" style="display:none">
+      <div class="plan-section-sub">Estimated federal taxes based on your transactions.</div>
+      <div class="tax-year-row" style="margin-top:14px;display:flex;align-items:center;gap:10px">
+        <select class="form-input form-select" id="taxYearSelect" style="margin-bottom:0;flex:1"></select>
+        <button class="primary-btn" id="taxCalcBtn" style="width:auto;padding:11px 16px">Calculate</button>
+      </div>
+      <div id="taxResults" style="margin-top:14px;display:none"></div>
+    </div>
+
+    <!-- Challenges section (Feature 7) -->
+    <div class="plan-section" id="planChallenges" style="display:none">
+      <div class="plan-section-sub">Gamify your saving habits.</div>
+
+      <!-- 52-Week Challenge -->
+      <div class="ov-card" style="margin-top:14px;padding:14px">
+        <div class="ov-card-title" style="margin-bottom:6px">52-Week Challenge</div>
+        <div class="challenge-sub" id="challenge52Sub">Save $1 in week 1, $2 in week 2, up to $52 in week 52.</div>
+        <div class="challenge-stats-row" style="margin:10px 0">
+          <span class="challenge-saved-amt" id="challenge52Saved">$0 saved</span>
+          <div class="progress-bar" style="flex:1;margin:0 12px">
+            <div class="progress-fill" id="challenge52Fill" style="width:0%"></div>
+          </div>
+          <span class="challenge-total" style="font-size:12px;color:var(--muted)">of $1,378</span>
+        </div>
+        <div class="challenge-grid" id="challenge52Grid"></div>
+      </div>
+
+      <!-- No-Spend Streak -->
+      <div class="ov-card" style="margin-top:10px;padding:14px">
+        <div class="ov-card-title" style="margin-bottom:6px">No-Spend Streak</div>
+        <div class="nospend-display" id="nospendDisplay">
+          <span class="nospend-emoji">🧊</span>
+          <span class="nospend-count" id="nospendCount">—</span>
+          <span class="nospend-label">consecutive days with no expenses</span>
+        </div>
+      </div>
+
+      <!-- Round-Up Savings -->
+      <div class="ov-card" style="margin-top:10px;padding:14px">
+        <div class="ov-card-title" style="margin-bottom:6px">Round-Up Savings</div>
+        <div class="roundup-display">
+          <span class="roundup-amt" id="roundupAmt">$0.00</span>
+          <span class="roundup-hint">you could have saved by rounding each purchase to the nearest dollar</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared Expenses section (Feature 9) -->
+    <div class="plan-section" id="planShared" style="display:none">
+      <div class="plan-section-sub">Track expenses split with friends or family.</div>
+
+      <!-- Summary -->
+      <div id="sharedSummary" style="margin-top:14px;display:none">
+        <div class="shared-summary-row">
+          <div class="shared-summary-item">
+            <div class="shared-summary-val shared-owed-to-me" id="sharedOwedToMe">$0</div>
+            <div class="shared-summary-key">owed to you</div>
+          </div>
+          <div class="shared-summary-sep"></div>
+          <div class="shared-summary-item">
+            <div class="shared-summary-val shared-you-owe" id="sharedYouOwe">$0</div>
+            <div class="shared-summary-key">you owe</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add form -->
+      <div class="card" style="margin-top:14px">
+        <input class="form-input" id="sharedPerson" type="text" placeholder="Person's name" autocomplete="off" />
+        <input class="form-input" id="sharedDesc" type="text" placeholder="Description (e.g. Dinner)" autocomplete="off" />
+        <div class="sub-form-row">
+          <input class="form-input" id="sharedAmount" type="number" placeholder="Amount ($)" min="0" step="0.01" style="margin-bottom:0" />
+          <input class="form-input" id="sharedDate" type="date" style="margin-bottom:0" />
+        </div>
+        <div class="shared-paidby-row" style="margin-top:10px">
+          <span class="schedule-field-label" style="margin:0">Who paid?</span>
+          <div class="tx-type-row" style="margin:6px 0 0">
+            <button class="tx-type-btn active" id="sharedPaidMe" data-paid="me">You paid</button>
+            <button class="tx-type-btn" id="sharedPaidThem" data-paid="them">They paid</button>
+          </div>
+        </div>
+        <button class="primary-btn" style="margin-top:10px" id="sharedAddBtn">Add expense</button>
+      </div>
+
+      <!-- Show settled toggle -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+        <div class="section-label" style="margin:0">Shared expenses</div>
+        <label class="recurring-label" style="margin:0;cursor:pointer">
+          <input type="checkbox" id="sharedShowSettled" />
+          Show settled
+        </label>
+      </div>
+      <div id="sharedList" style="margin-top:10px"><div class="empty-state">No shared expenses yet.</div></div>
+    </div>
+
+  </div>
+
+  <!-- ── Calendar tab ── -->
+  <div class="tab-panel" id="tab-calendar">
+
+    <div class="payday-banner" id="paydayBanner" style="display:none">
+      <div class="payday-banner-left">
+        <div class="payday-banner-label">Next payday</div>
+        <div class="payday-banner-date" id="paydayDate"></div>
+      </div>
+      <div class="payday-banner-countdown" id="paydayCountdown"></div>
+    </div>
+
+    <div class="payday-banner payday-banner--empty" id="paydayBannerEmpty">
+      Set a payday schedule below to see your next payday.
+    </div>
+
+    <div class="cal-wrap">
+      <div class="cal-nav">
+        <button class="month-arrow" id="calPrev">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="month-label" id="calMonthLabel"></span>
+        <button class="month-arrow" id="calNext">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="cal-legend">
+      <div class="cal-legend-item"><div class="cal-legend-dot cal-legend-dot--today"></div>Today</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot cal-legend-dot--payday"></div>Payday</div>
+    </div>
+
+    <div class="section-label">Payday schedule</div>
+    <div class="schedule-card card">
+      <select class="form-input form-select" id="scheduleType">
+        <option value="" disabled selected>Schedule type...</option>
+        <option value="weekly">Every week</option>
+        <option value="biweekly">Every two weeks</option>
+        <option value="semimonthly">Twice a month</option>
+        <option value="monthly">Once a month</option>
+        <option value="custom">Custom (tap dates on calendar)</option>
+      </select>
+
+      <div id="scheduleWeeklyOpts" class="schedule-opts" style="display:none">
+        <label class="schedule-field-label">Day of week</label>
+        <select class="form-input form-select" id="scheduleWeekDay">
+          <option value="0">Sunday</option>
+          <option value="1">Monday</option>
+          <option value="2">Tuesday</option>
+          <option value="3">Wednesday</option>
+          <option value="4">Thursday</option>
+          <option value="5">Friday</option>
+          <option value="6">Saturday</option>
+        </select>
+      </div>
+
+      <div id="scheduleBiweeklyOpts" class="schedule-opts" style="display:none">
+        <label class="schedule-field-label">Most recent or next payday</label>
+        <input class="form-input" type="date" id="scheduleBiweeklyStart" />
+      </div>
+
+      <div id="scheduleSemimonthlyOpts" class="schedule-opts" style="display:none">
+        <label class="schedule-field-label">Day 1 and Day 2 of each month</label>
+        <div class="schedule-two-inputs">
+          <input class="form-input" type="number" id="scheduleSemiD1" placeholder="e.g. 1" min="1" max="28" />
+          <input class="form-input" type="number" id="scheduleSemiD2" placeholder="e.g. 15" min="1" max="28" />
+        </div>
+      </div>
+
+      <div id="scheduleMonthlyOpts" class="schedule-opts" style="display:none">
+        <label class="schedule-field-label">Day of each month</label>
+        <input class="form-input" type="number" id="scheduleMonthlyDay" placeholder="e.g. 1" min="1" max="28" />
+      </div>
+
+      <div id="scheduleCustomNote" class="schedule-opts schedule-custom-note" style="display:none">
+        Tap any date on the calendar above to mark it as a payday.
+      </div>
+
+      <button class="primary-btn" id="scheduleSaveBtn">Save schedule</button>
+    </div>
+
+  </div>
+
+  <!-- ── Chat tab ── -->
+  <div class="tab-panel" id="tab-chat">
+
+    <div class="messages" id="messages">
+      <div class="chat-welcome">
+        <div class="chat-welcome-emoji">💬</div>
+        <div class="chat-welcome-text">Ask Clarity anything about your finances. It has your real data.</div>
+        <div class="quick-asks">
+          <button class="quick-ask" data-q="How am I doing this month?">How am I doing?</button>
+          <button class="quick-ask" data-q="Where can I cut back on spending?">Where to cut back?</button>
+          <button class="quick-ask" data-q="Am I on track to hit my savings goals?">On track for goals?</button>
+          <button class="quick-ask" data-q="What's my biggest financial risk right now?">Biggest risk?</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea class="msg-input" id="msgInput" placeholder="Ask Clarity..." rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Category drill-down sheet -->
+  <div class="cat-sheet" id="catSheet">
+    <div class="cat-sheet-backdrop" id="catSheetBackdrop"></div>
+    <div class="cat-sheet-panel">
+      <div class="cat-sheet-handle"></div>
+      <div class="cat-sheet-header">
+        <div class="cat-sheet-title">
+          <span class="cat-sheet-emoji" id="catSheetEmoji"></span>
+          <span id="catSheetName"></span>
+        </div>
+        <div class="cat-sheet-total" id="catSheetTotal"></div>
+      </div>
+      <div class="cat-sheet-month" id="catSheetMonth"></div>
+      <div class="cat-sheet-list" id="catSheetList"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
