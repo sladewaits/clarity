@@ -84,6 +84,73 @@ document.querySelectorAll('.tab').forEach(btn => {
   });
 });
 
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
+  if (btn) btn.classList.add('active');
+  const panel = document.getElementById('tab-' + tab);
+  if (panel) panel.classList.add('active');
+  activeTab = tab;
+  if (tab === 'overview') loadOverview();
+  if (tab === 'transactions') { loadTransactions(); loadRecurring(); }
+  if (tab === 'plan') { loadBudgets(); loadGoals(); }
+  if (tab === 'calendar') loadCalendar();
+}
+
+document.getElementById('quickAddIncome').addEventListener('click', () => {
+  switchTab('transactions');
+  setTxType('income');
+  setTimeout(() => document.getElementById('txAmount').focus(), 100);
+});
+
+document.getElementById('quickAddExpense').addEventListener('click', () => {
+  switchTab('transactions');
+  setTxType('expense');
+  setTimeout(() => document.getElementById('txAmount').focus(), 100);
+});
+
+function loadGreeting() {
+  const hour = new Date().getHours();
+  let greeting = 'Good morning';
+  if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
+  else if (hour >= 17) greeting = 'Good evening';
+  const firstName = (currentUser?.name || '').split(' ')[0];
+  const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  document.getElementById('greetingText').textContent = greeting;
+  document.getElementById('greetingName').textContent = firstName;
+  document.getElementById('greetingDate').textContent = date;
+  document.getElementById('greetingAvatar').textContent = currentUser?.avatar || '😊';
+}
+
+async function loadRecentTxs() {
+  const res = await apiFetch('/api/transactions');
+  const txs = await res.json();
+  const recent = txs.slice(0, 4);
+  const card = document.getElementById('recentTxCard');
+  if (!recent.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const catEmoji = {
+    Housing:'🏠', Food:'🍔', Transport:'🚗', Entertainment:'🎬',
+    Shopping:'🛍️', Health:'💊', Subscriptions:'📱',
+    Salary:'💼', Freelance:'💻', Business:'🏢', Investment:'📈',
+    'Other income':'💵', 'Other expense':'💸',
+  };
+  document.getElementById('recentTxList').innerHTML = recent.map(tx => {
+    const emoji = catEmoji[tx.category] || (tx.type === 'income' ? '💵' : '💸');
+    const sign = tx.type === 'income' ? '+' : '-';
+    const color = tx.type === 'income' ? '#22c55e' : '#f87171';
+    const date = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const desc = tx.description || tx.category;
+    return `<div class="recent-tx-row">
+      <span class="recent-tx-emoji">${emoji}</span>
+      <span class="recent-tx-desc">${desc}</span>
+      <span class="recent-tx-date">${date}</span>
+      <span class="recent-tx-amt" style="color:${color}">${sign}$${tx.amount.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+}
+
 // ── Plan tab segments ──
 const ALL_PLAN_SECTIONS = ['planBudgets','planGoals','planSubscriptions','planNetworth','planDebt','planCredit','planTax','planChallenges','planShared'];
 
@@ -1906,6 +1973,7 @@ async function loadShared() {
 // ── Patch loadOverview to also fetch new data ──
 const _origLoadOverview = loadOverview;
 loadOverview = async function () {
+  loadGreeting();
   await _origLoadOverview();
   loadAlerts();
   loadUpcoming();
@@ -1916,6 +1984,7 @@ loadOverview = async function () {
   loadEmergency();
   loadFreedom();
   loadMilestones();
+  loadRecentTxs();
 };
 
 // ── Auth handlers ──

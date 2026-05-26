@@ -87,6 +87,22 @@
   <!-- ── Overview tab ── -->
   <div class="tab-panel active" id="tab-overview">
 
+    <!-- Greeting card -->
+    <div class="greeting-card">
+      <div class="greeting-top">
+        <div>
+          <div class="greeting-text" id="greetingText">Good morning</div>
+          <div class="greeting-name" id="greetingName"></div>
+          <div class="greeting-date" id="greetingDate"></div>
+        </div>
+        <div class="greeting-avatar-large" id="greetingAvatar">😊</div>
+      </div>
+      <div class="greeting-actions">
+        <button class="quick-add-btn quick-add-income" id="quickAddIncome">+ Income</button>
+        <button class="quick-add-btn quick-add-expense" id="quickAddExpense">+ Expense</button>
+      </div>
+    </div>
+
     <!-- Health score -->
     <div class="score-card" id="scoreCard">
       <div class="score-left">
@@ -133,6 +149,15 @@
           <div class="summary-stat-key">saved</div>
         </div>
       </div>
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="ov-card" id="recentTxCard" style="display:none">
+      <div class="ov-card-title-row">
+        <span class="ov-card-title">Recent</span>
+        <button class="forecast-set-btn" onclick="switchTab('transactions')">See all</button>
+      </div>
+      <div id="recentTxList"></div>
     </div>
 
     <!-- Savings card -->
