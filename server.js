@@ -482,7 +482,7 @@ app.get('/api/transactions', requireAuth, async (req, res) => {
 });
 
 app.post('/api/transactions', requireAuth, async (req, res) => {
-  const { type, amount, category, description, recurring } = req.body;
+  const { type, amount, category, description, recurring, date } = req.body;
   if (!type || !amount || !category) return res.status(400).json({ error: 'Missing fields' });
   const data = await load(req.userId);
   const tx = {
@@ -490,7 +490,7 @@ app.post('/api/transactions', requireAuth, async (req, res) => {
     type, amount: parseFloat(amount), category,
     description: description || '',
     recurring: !!recurring,
-    date: new Date().toISOString(),
+    date: date ? new Date(date + 'T12:00:00').toISOString() : new Date().toISOString(),
   };
   data.transactions.push(tx);
   await save(data, req.userId);

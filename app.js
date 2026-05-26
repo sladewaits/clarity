@@ -334,18 +334,25 @@ function setTxType(type) {
   document.querySelector(`.tx-type-btn[data-type="${type}"]`).classList.add('active');
 }
 
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+document.getElementById('txDate').value = todayStr();
+
 document.getElementById('txSubmitBtn').addEventListener('click', async () => {
   const amount = document.getElementById('txAmount').value;
   const category = document.getElementById('txCategory').value;
   const description = document.getElementById('txDesc').value;
   const recurring = document.getElementById('txRecurring').checked;
+  const date = document.getElementById('txDate').value || todayStr();
   if (!amount || !category) return;
 
   const btn = document.getElementById('txSubmitBtn');
   btn.disabled = true;
   await apiFetch('/api/transactions', {
     method: 'POST',
-    body: JSON.stringify({ type: txType, amount, category, description, recurring }),
+    body: JSON.stringify({ type: txType, amount, category, description, recurring, date }),
   });
   btn.disabled = false;
 
@@ -353,6 +360,7 @@ document.getElementById('txSubmitBtn').addEventListener('click', async () => {
   document.getElementById('txCategory').value = '';
   document.getElementById('txDesc').value = '';
   document.getElementById('txRecurring').checked = false;
+  document.getElementById('txDate').value = todayStr();
   loadTransactions();
 });
 
