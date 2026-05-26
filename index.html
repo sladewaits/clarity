@@ -55,7 +55,7 @@
       <span class="logo-tag">finance tracker</span>
     </div>
     <button class="profile-btn" id="profileBtn">
-      <span class="profile-avatar" id="headerAvatar">😊</span>
+      <span class="profile-avatar" id="headerAvatar"></span>
       <span class="profile-name" id="headerName"></span>
     </button>
   </header>
@@ -95,7 +95,7 @@
           <div class="greeting-name" id="greetingName"></div>
           <div class="greeting-date" id="greetingDate"></div>
         </div>
-        <div class="greeting-avatar-large" id="greetingAvatar">😊</div>
+        <div class="greeting-avatar-large" id="greetingAvatar"></div>
       </div>
       <div class="greeting-actions">
         <button class="quick-add-btn quick-add-income" id="quickAddIncome">+ Income</button>
@@ -563,11 +563,11 @@
       <div class="card" style="margin-bottom:10px">
         <input class="form-input" id="assetName" type="text" placeholder="Name (e.g. Savings account)" autocomplete="off" />
         <select class="form-input form-select" id="assetType">
-          <option value="liquid">💵 Cash / Savings</option>
-          <option value="investment">📈 Investment / Retirement</option>
-          <option value="property">🏠 Property</option>
-          <option value="vehicle">🚗 Vehicle</option>
-          <option value="other">📦 Other</option>
+          <option value="liquid">Cash / Savings</option>
+          <option value="investment">Investment / Retirement</option>
+          <option value="property">Property</option>
+          <option value="vehicle">Vehicle</option>
+          <option value="other">Other</option>
         </select>
         <input class="form-input" id="assetValue" type="number" placeholder="Current value ($)" min="0" />
         <button class="primary-btn" id="addAssetBtn">Add asset</button>
@@ -852,10 +852,7 @@
         <h3 class="profile-sheet-title">Profile</h3>
         <button class="profile-logout-btn" id="logoutBtn">Sign out</button>
       </div>
-      <div class="profile-big-avatar" id="profileBigAvatar">😊</div>
-      <div class="profile-avatar-picker" id="avatarPicker">
-        😊 😎 🤑 💪 🧠 🦁 🐯 🦊 🐻 🐼 🦄 🌟 🚀 💎 🏆 🌈
-      </div>
+      <div class="profile-big-avatar" id="profileBigAvatar"></div>
       <div style="margin-top:16px">
         <label class="schedule-field-label">Your name</label>
         <input class="form-input" id="profileName" type="text" placeholder="Name" />
@@ -873,7 +870,6 @@
     <div class="tutorial-backdrop"></div>
     <div class="tutorial-modal">
       <button class="tutorial-skip" id="tutorialSkip">Skip tour</button>
-      <div class="tutorial-emoji" id="tutorialEmoji">👋</div>
       <h2 class="tutorial-title" id="tutorialTitle"></h2>
       <p class="tutorial-body" id="tutorialBody"></p>
       <div class="tutorial-footer">

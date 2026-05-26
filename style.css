@@ -1013,7 +1013,16 @@ body {
   color: rgba(255,255,255,0.3);
   margin-top: 4px;
 }
-.greeting-avatar-large { font-size: 38px; line-height: 1; }
+.greeting-avatar-large {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
 .greeting-actions { display: flex; gap: 10px; }
 .quick-add-btn {
   flex: 1;
@@ -2224,7 +2233,15 @@ body {
 
 .profile-btn:hover { border-color: var(--accent); }
 
-.profile-avatar { font-size: 18px; line-height: 1; }
+.profile-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
 
 .profile-name {
   font-size: 13px;
@@ -2310,28 +2327,15 @@ body {
 .profile-logout-btn:hover { background: var(--red-light); border-color: #fca5a5; }
 
 .profile-big-avatar {
-  font-size: 56px;
-  text-align: center;
-  margin-bottom: 12px;
-  line-height: 1;
-  cursor: default;
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 28px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
 }
-
-.profile-avatar-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 12px;
-  margin-bottom: 16px;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.profile-avatar-picker span { cursor: pointer; }
 
 /* ── Tutorial ── */
 .tutorial-overlay {

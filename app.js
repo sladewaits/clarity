@@ -14,11 +14,6 @@ function apiFetch(url, opts = {}) {
 }
 
 // ── Constants ──
-const CATEGORY_EMOJI = {
-  'Salary': '💼', 'Freelance': '💻', 'Business': '🏢', 'Investment': '📈', 'Other income': '💰',
-  'Housing': '🏠', 'Food': '🍔', 'Transport': '🚗', 'Entertainment': '🎮',
-  'Shopping': '🛍️', 'Health': '🏥', 'Subscriptions': '📱', 'Other expense': '📦',
-};
 
 const CATEGORY_COLOR = {
   'Housing': '#6366f1', 'Food': '#f59e0b', 'Transport': '#3b82f6',
@@ -120,7 +115,7 @@ function loadGreeting() {
   document.getElementById('greetingText').textContent = greeting;
   document.getElementById('greetingName').textContent = firstName;
   document.getElementById('greetingDate').textContent = date;
-  document.getElementById('greetingAvatar').textContent = currentUser?.avatar || '😊';
+  document.getElementById('greetingAvatar').textContent = userInitial();
 }
 
 async function loadRecentTxs() {
@@ -130,20 +125,12 @@ async function loadRecentTxs() {
   const card = document.getElementById('recentTxCard');
   if (!recent.length) { card.style.display = 'none'; return; }
   card.style.display = '';
-  const catEmoji = {
-    Housing:'🏠', Food:'🍔', Transport:'🚗', Entertainment:'🎬',
-    Shopping:'🛍️', Health:'💊', Subscriptions:'📱',
-    Salary:'💼', Freelance:'💻', Business:'🏢', Investment:'📈',
-    'Other income':'💵', 'Other expense':'💸',
-  };
   document.getElementById('recentTxList').innerHTML = recent.map(tx => {
-    const emoji = catEmoji[tx.category] || (tx.type === 'income' ? '💵' : '💸');
     const sign = tx.type === 'income' ? '+' : '-';
     const color = tx.type === 'income' ? '#22c55e' : '#f87171';
     const date = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const desc = tx.description || tx.category;
     return `<div class="recent-tx-row">
-      <span class="recent-tx-emoji">${emoji}</span>
       <span class="recent-tx-desc">${desc}</span>
       <span class="recent-tx-date">${date}</span>
       <span class="recent-tx-amt" style="color:${color}">${sign}$${tx.amount.toFixed(2)}</span>
@@ -832,7 +819,6 @@ async function loadHealthScore() {
 
   if (!data.ready) {
     card.innerHTML = `<div class="score-unlock">
-      <div class="score-unlock-icon">📊</div>
       <div class="score-unlock-title">Your score is building</div>
       <div class="score-unlock-body">Log your income and expenses this month to unlock your financial health score.</div>
       <button class="score-unlock-btn" onclick="switchTab('transactions')">Add your first transaction</button>
@@ -911,7 +897,7 @@ async function loadForecast() {
 }
 
 // ── Net worth ──
-const ASSET_ICON = { liquid: '💵', investment: '📈', property: '🏠', vehicle: '🚗', other: '📦' };
+const ASSET_LABEL = { liquid: 'Cash', investment: 'Investment', property: 'Property', vehicle: 'Vehicle', other: 'Other' };
 
 async function loadNetWorth() {
   const res = await apiFetch('/api/networth');
@@ -926,10 +912,9 @@ async function loadNetWorth() {
   const aList = document.getElementById('assetList');
   aList.innerHTML = data.assets.length ? data.assets.map(a => `
     <div class="nw-item">
-      <div class="nw-item-icon">${ASSET_ICON[a.type] || '📦'}</div>
       <div class="nw-item-info">
         <div class="nw-item-name">${a.name}</div>
-        <div class="nw-item-type">${a.type}</div>
+        <div class="nw-item-type">${ASSET_LABEL[a.type] || a.type}</div>
       </div>
       <div class="nw-item-val asset">${fmt(a.value)}</div>
       <button class="nw-delete" data-type="assets" data-id="${a.id}">×</button>
@@ -1281,7 +1266,7 @@ async function loadAlerts() {
       const msg = over
         ? `${emoji} ${a.category} is $${(a.spent - a.limit).toFixed(0)} over budget`
         : `${emoji} ${a.category} is at ${Math.round(a.pct * 100)}% of budget`;
-      return `<div class="alert-card alert-card--${a.level}"><span class="alert-icon">${over ? '🚨' : '⚠️'}</span>${msg}</div>`;
+      return `<div class="alert-card alert-card--${a.level}">${msg}</div>`;
     }).join('');
   }
 
@@ -1536,7 +1521,7 @@ async function loadSavings() {
   }
   const streakEl = document.getElementById('savingsStreak');
   if (streak >= 2) {
-    streakEl.textContent = `🔥 ${streak} mo streak`;
+    streakEl.textContent = `${streak} mo streak`;
     streakEl.style.display = '';
   } else {
     streakEl.style.display = 'none';
@@ -2061,7 +2046,7 @@ document.getElementById('profileBtn').addEventListener('click', () => {
   document.getElementById('profileName').value = currentUser.name || '';
   document.getElementById('profileIncomeGoal').value = currentUser.monthlyIncomeGoal || '';
   document.getElementById('profileSavingsRate').value = currentUser.targetSavingsRate || 20;
-  document.getElementById('profileBigAvatar').textContent = currentUser.avatar || '😊';
+  document.getElementById('profileBigAvatar').textContent = userInitial();
   document.getElementById('profileSheet').classList.add('open');
 });
 
@@ -2069,25 +2054,18 @@ document.getElementById('profileSheetBackdrop').addEventListener('click', () => 
   document.getElementById('profileSheet').classList.remove('open');
 });
 
-document.getElementById('avatarPicker').addEventListener('click', (e) => {
-  const emoji = e.target.textContent.trim();
-  if (!emoji || emoji.length > 2) return;
-  document.getElementById('profileBigAvatar').textContent = emoji;
-});
-
 document.getElementById('saveProfileBtn').addEventListener('click', async () => {
   const name = document.getElementById('profileName').value.trim();
-  const avatar = document.getElementById('profileBigAvatar').textContent;
   const monthlyIncomeGoal = parseFloat(document.getElementById('profileIncomeGoal').value) || 0;
   const targetSavingsRate = parseFloat(document.getElementById('profileSavingsRate').value) || 20;
 
   const res = await apiFetch('/auth/profile', {
     method: 'PUT',
-    body: JSON.stringify({ name, avatar, monthlyIncomeGoal, targetSavingsRate }),
+    body: JSON.stringify({ name, monthlyIncomeGoal, targetSavingsRate }),
   });
   const updated = await res.json();
   currentUser = { ...currentUser, ...updated };
-  document.getElementById('headerAvatar').textContent = avatar;
+  document.getElementById('headerAvatar').textContent = userInitial();
   document.getElementById('headerName').textContent = name;
   document.getElementById('profileSheet').classList.remove('open');
 });
@@ -2116,9 +2094,13 @@ function showAuth() {
   document.getElementById('authOverlay').style.display = 'flex';
 }
 
+function userInitial() {
+  return (currentUser?.name || '?').charAt(0).toUpperCase();
+}
+
 function showApp(isNew = false) {
   document.getElementById('authOverlay').style.display = 'none';
-  document.getElementById('headerAvatar').textContent = currentUser.avatar || '😊';
+  document.getElementById('headerAvatar').textContent = userInitial();
   document.getElementById('headerName').textContent = currentUser.name || '';
   updateMonthNav();
   updateCalMonthLabel();
@@ -2129,43 +2111,36 @@ function showApp(isNew = false) {
 // ── Tutorial ──
 const TUTORIAL_STEPS = [
   {
-    emoji: '👋',
     title: 'Welcome to Clarity!',
     body: () => `Hey ${currentUser?.name?.split(' ')[0] || 'there'}! You're all set. Let's take a 60-second tour so you know where everything is.`,
     tab: null,
   },
   {
-    emoji: '📊',
     title: 'Your Overview',
     body: () => 'This is your home base. At a glance you can see your net for the month, savings rate, financial health score, spending breakdown, and upcoming bills.',
     tab: 'overview',
   },
   {
-    emoji: '💸',
     title: 'Log Transactions',
     body: () => 'Tap Transactions to log income and expenses. You can type them in manually or snap a photo of a check or receipt and let AI fill it in for you.',
     tab: 'transactions',
   },
   {
-    emoji: '🗂️',
     title: 'Plan Your Money',
     body: () => 'The Plan tab is your financial control center — set spending budgets, create savings goals, track subscriptions, manage debt, and monitor your net worth.',
     tab: 'plan',
   },
   {
-    emoji: '📅',
     title: 'Track Paydays',
     body: () => 'Set your pay schedule in the Calendar tab and Clarity will show you exactly how many days until your next payday, highlighted right on the calendar.',
     tab: 'calendar',
   },
   {
-    emoji: '🤖',
     title: 'Ask Clarity Anything',
     body: () => 'The Chat tab connects you to an AI that knows your real financial data. Ask "Where am I overspending?" or "Am I on track for my goals?" and get honest answers.',
     tab: 'chat',
   },
   {
-    emoji: '🚀',
     title: "You're ready!",
     body: () => 'Start by adding your first transaction — even one entry unlocks your spending chart and AI insights. Your financial picture gets clearer every day.',
     tab: 'transactions',
@@ -2185,7 +2160,6 @@ function renderTutorialStep() {
   const total = TUTORIAL_STEPS.length;
   const isLast = tutorialStep === total - 1;
 
-  document.getElementById('tutorialEmoji').textContent = step.emoji;
   document.getElementById('tutorialTitle').textContent = step.title;
   document.getElementById('tutorialBody').textContent = step.body();
   document.getElementById('tutorialNext').textContent = isLast ? 'Get started →' : 'Next →';
