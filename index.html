@@ -110,19 +110,19 @@
         <button class="accounts-edit-btn" id="accountsEditBtn">Edit</button>
       </div>
       <div class="accounts-display" id="accountsDisplay">
-        <div class="account-row">
-          <span class="account-label">Checking</span>
-          <span class="account-val" id="checkingDisplay">—</span>
+        <div class="accounts-tiles">
+          <div class="account-tile account-tile--checking">
+            <div class="account-tile-label">Checking</div>
+            <div class="account-tile-val" id="checkingDisplay">—</div>
+          </div>
+          <div class="account-tile account-tile--savings">
+            <div class="account-tile-label">Savings</div>
+            <div class="account-tile-val" id="savingsDisplay">—</div>
+          </div>
         </div>
-        <div class="account-divider"></div>
-        <div class="account-row">
-          <span class="account-label">Savings</span>
-          <span class="account-val" id="savingsDisplay">—</span>
-        </div>
-        <div class="account-divider"></div>
-        <div class="account-row account-row--total">
-          <span class="account-label">Total</span>
-          <span class="account-val account-val--total" id="accountsTotalDisplay">—</span>
+        <div class="accounts-total-row">
+          <span class="accounts-total-label">Total balance</span>
+          <span class="accounts-total-val" id="accountsTotalDisplay">—</span>
         </div>
       </div>
       <div class="accounts-edit-form" id="accountsEditForm" style="display:none">
