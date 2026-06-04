@@ -39,6 +39,7 @@ function mkDefaults() {
     transactions: [], budgets: [], goals: [], messages: [],
     paydaySchedule: null, recurring: [], subscriptions: [],
     assets: [], liabilities: [], currentBalance: null,
+    checkingBalance: null, savingsBalance: null,
     creditScores: [], challenges: {}, shared: [], milestones: [],
     freedomTarget: null,
   };
@@ -52,6 +53,8 @@ function mergeDefaults(d) {
     assets: d.assets || [],
     liabilities: d.liabilities || [],
     currentBalance: d.currentBalance ?? null,
+    checkingBalance: d.checkingBalance ?? null,
+    savingsBalance: d.savingsBalance ?? null,
     creditScores: d.creditScores || [],
     challenges: d.challenges || {},
     shared: d.shared || [],
@@ -1028,6 +1031,21 @@ app.post('/api/forecast/balance', requireAuth, async (req, res) => {
   data.currentBalance = parseFloat(balance) || 0;
   await save(data, req.userId);
   res.json({ currentBalance: data.currentBalance });
+});
+
+// ── Account balances ──
+app.get('/api/accounts', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
+  res.json({ checkingBalance: data.checkingBalance, savingsBalance: data.savingsBalance });
+});
+
+app.post('/api/accounts', requireAuth, async (req, res) => {
+  const { checkingBalance, savingsBalance } = req.body;
+  const data = await load(req.userId);
+  if (checkingBalance !== undefined) data.checkingBalance = parseFloat(checkingBalance) || 0;
+  if (savingsBalance !== undefined) data.savingsBalance = parseFloat(savingsBalance) || 0;
+  await save(data, req.userId);
+  res.json({ checkingBalance: data.checkingBalance, savingsBalance: data.savingsBalance });
 });
 
 // Paydays

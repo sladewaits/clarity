@@ -103,6 +103,41 @@
       </div>
     </div>
 
+    <!-- Account balances -->
+    <div class="accounts-card" id="accountsCard">
+      <div class="accounts-header">
+        <span class="accounts-title">Accounts</span>
+        <button class="accounts-edit-btn" id="accountsEditBtn">Edit</button>
+      </div>
+      <div class="accounts-display" id="accountsDisplay">
+        <div class="account-row">
+          <span class="account-label">Checking</span>
+          <span class="account-val" id="checkingDisplay">—</span>
+        </div>
+        <div class="account-divider"></div>
+        <div class="account-row">
+          <span class="account-label">Savings</span>
+          <span class="account-val" id="savingsDisplay">—</span>
+        </div>
+        <div class="account-divider"></div>
+        <div class="account-row account-row--total">
+          <span class="account-label">Total</span>
+          <span class="account-val account-val--total" id="accountsTotalDisplay">—</span>
+        </div>
+      </div>
+      <div class="accounts-edit-form" id="accountsEditForm" style="display:none">
+        <div class="accounts-input-row">
+          <label class="account-input-label">Checking</label>
+          <input class="form-input accounts-input" id="checkingInput" type="number" placeholder="$0.00" min="0" step="0.01" />
+        </div>
+        <div class="accounts-input-row">
+          <label class="account-input-label">Savings</label>
+          <input class="form-input accounts-input" id="savingsInput" type="number" placeholder="$0.00" min="0" step="0.01" />
+        </div>
+        <button class="primary-btn" id="accountsSaveBtn" style="margin-top:4px">Save balances</button>
+      </div>
+    </div>
+
     <!-- Health score -->
     <div class="score-card" id="scoreCard">
       <div class="score-left">

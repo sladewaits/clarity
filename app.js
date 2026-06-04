@@ -1955,10 +1955,47 @@ async function loadShared() {
   });
 }
 
+// ── Account balances ──
+async function loadAccounts() {
+  const res = await apiFetch('/api/accounts');
+  const data = await res.json();
+  const fmt = v => v !== null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+  document.getElementById('checkingDisplay').textContent = fmt(data.checkingBalance);
+  document.getElementById('savingsDisplay').textContent = fmt(data.savingsBalance);
+  const total = (data.checkingBalance ?? 0) + (data.savingsBalance ?? 0);
+  document.getElementById('accountsTotalDisplay').textContent =
+    (data.checkingBalance !== null || data.savingsBalance !== null) ? '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+  if (data.checkingBalance !== null) document.getElementById('checkingInput').value = data.checkingBalance;
+  if (data.savingsBalance !== null) document.getElementById('savingsInput').value = data.savingsBalance;
+}
+
+document.getElementById('accountsEditBtn').addEventListener('click', () => {
+  const form = document.getElementById('accountsEditForm');
+  const display = document.getElementById('accountsDisplay');
+  const isEditing = form.style.display !== 'none';
+  form.style.display = isEditing ? 'none' : '';
+  display.style.display = isEditing ? '' : 'none';
+  document.getElementById('accountsEditBtn').textContent = isEditing ? 'Edit' : 'Cancel';
+});
+
+document.getElementById('accountsSaveBtn').addEventListener('click', async () => {
+  const checking = document.getElementById('checkingInput').value;
+  const savings = document.getElementById('savingsInput').value;
+  await apiFetch('/api/accounts', {
+    method: 'POST',
+    body: JSON.stringify({ checkingBalance: checking, savingsBalance: savings }),
+  });
+  document.getElementById('accountsEditForm').style.display = 'none';
+  document.getElementById('accountsDisplay').style.display = '';
+  document.getElementById('accountsEditBtn').textContent = 'Edit';
+  loadAccounts();
+});
+
 // ── Patch loadOverview to also fetch new data ──
 const _origLoadOverview = loadOverview;
 loadOverview = async function () {
   loadGreeting();
+  loadAccounts();
   await _origLoadOverview();
   loadAlerts();
   loadUpcoming();
