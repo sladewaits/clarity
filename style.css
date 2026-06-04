@@ -1087,16 +1087,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.accounts-edit-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: rgba(255,255,255,0.5);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-}
 .accounts-tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1148,13 +1138,21 @@ body {
   font-weight: 800;
   color: var(--accent);
 }
-.accounts-input-row { margin-bottom: 10px; }
+.accounts-inputs { margin-top: 12px; }
+.accounts-input-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.accounts-input-row { display: flex; flex-direction: column; }
 .account-input-label {
-  display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255,255,255,0.45);
   margin-bottom: 4px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 .accounts-input { margin-bottom: 0 !important; }
 

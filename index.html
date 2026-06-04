@@ -107,34 +107,33 @@
     <div class="accounts-card" id="accountsCard">
       <div class="accounts-header">
         <span class="accounts-title">Accounts</span>
-        <button class="accounts-edit-btn" id="accountsEditBtn">Edit</button>
       </div>
-      <div class="accounts-display" id="accountsDisplay">
-        <div class="accounts-tiles">
-          <div class="account-tile account-tile--checking">
-            <div class="account-tile-label">Checking</div>
-            <div class="account-tile-val" id="checkingDisplay">—</div>
-          </div>
-          <div class="account-tile account-tile--savings">
-            <div class="account-tile-label">Savings</div>
-            <div class="account-tile-val" id="savingsDisplay">—</div>
-          </div>
+      <div class="accounts-tiles">
+        <div class="account-tile account-tile--checking">
+          <div class="account-tile-label">Checking</div>
+          <div class="account-tile-val" id="checkingDisplay">—</div>
         </div>
-        <div class="accounts-total-row">
-          <span class="accounts-total-label">Total balance</span>
-          <span class="accounts-total-val" id="accountsTotalDisplay">—</span>
+        <div class="account-tile account-tile--savings">
+          <div class="account-tile-label">Savings</div>
+          <div class="account-tile-val" id="savingsDisplay">—</div>
         </div>
       </div>
-      <div class="accounts-edit-form" id="accountsEditForm" style="display:none">
-        <div class="accounts-input-row">
-          <label class="account-input-label">Checking</label>
-          <input class="form-input accounts-input" id="checkingInput" type="number" placeholder="$0.00" min="0" step="0.01" />
+      <div class="accounts-total-row">
+        <span class="accounts-total-label">Total balance</span>
+        <span class="accounts-total-val" id="accountsTotalDisplay">—</span>
+      </div>
+      <div class="accounts-inputs">
+        <div class="accounts-input-pair">
+          <div class="accounts-input-row">
+            <label class="account-input-label">Checking ($)</label>
+            <input class="form-input accounts-input" id="checkingInput" type="number" placeholder="0.00" min="0" step="0.01" />
+          </div>
+          <div class="accounts-input-row">
+            <label class="account-input-label">Savings ($)</label>
+            <input class="form-input accounts-input" id="savingsInput" type="number" placeholder="0.00" min="0" step="0.01" />
+          </div>
         </div>
-        <div class="accounts-input-row">
-          <label class="account-input-label">Savings</label>
-          <input class="form-input accounts-input" id="savingsInput" type="number" placeholder="$0.00" min="0" step="0.01" />
-        </div>
-        <button class="primary-btn" id="accountsSaveBtn" style="margin-top:4px">Save balances</button>
+        <button class="primary-btn" id="accountsSaveBtn">Update balances</button>
       </div>
     </div>
 

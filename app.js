@@ -1969,15 +1969,6 @@ async function loadAccounts() {
   if (data.savingsBalance !== null) document.getElementById('savingsInput').value = data.savingsBalance;
 }
 
-document.getElementById('accountsEditBtn').addEventListener('click', () => {
-  const form = document.getElementById('accountsEditForm');
-  const display = document.getElementById('accountsDisplay');
-  const isEditing = form.style.display !== 'none';
-  form.style.display = isEditing ? 'none' : '';
-  display.style.display = isEditing ? '' : 'none';
-  document.getElementById('accountsEditBtn').textContent = isEditing ? 'Edit' : 'Cancel';
-});
-
 document.getElementById('accountsSaveBtn').addEventListener('click', async () => {
   const checking = document.getElementById('checkingInput').value;
   const savings = document.getElementById('savingsInput').value;
@@ -1985,9 +1976,6 @@ document.getElementById('accountsSaveBtn').addEventListener('click', async () =>
     method: 'POST',
     body: JSON.stringify({ checkingBalance: checking, savingsBalance: savings }),
   });
-  document.getElementById('accountsEditForm').style.display = 'none';
-  document.getElementById('accountsDisplay').style.display = '';
-  document.getElementById('accountsEditBtn').textContent = 'Edit';
   loadAccounts();
 });
 
