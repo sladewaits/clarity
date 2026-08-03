@@ -8,7 +8,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Clarity" />
-  <meta name="theme-color" content="#161826" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
@@ -53,7 +55,7 @@
     <div class="ob-slide active" id="obSlide0" data-step="0">
       <div class="ob-slide-content">
         <div class="ob-icon-tile">
-          <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--color-accent, #9184d9)" stroke-width="2.5" opacity="0.35"/><circle cx="24" cy="24" r="11" fill="var(--color-accent, #9184d9)"/></svg>
+          <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--accent)" stroke-width="2.5" opacity="0.35"/><circle cx="24" cy="24" r="11" fill="var(--accent)"/></svg>
         </div>
         <div>
           <h2 class="ob-heading">See your money clearly</h2>
@@ -72,7 +74,7 @@
     <div class="ob-slide" id="obSlide1" data-step="1">
       <div class="ob-slide-content">
         <div class="ob-icon-tile">
-          <svg width="48" height="48" viewBox="0 0 48 48"><rect x="7" y="26" width="8" height="15" rx="2" fill="var(--color-accent, #9184d9)" opacity="0.4"/><rect x="20" y="16" width="8" height="25" rx="2" fill="var(--color-accent, #9184d9)" opacity="0.7"/><rect x="33" y="6" width="8" height="35" rx="2" fill="var(--color-accent, #9184d9)"/></svg>
+          <svg width="48" height="48" viewBox="0 0 48 48"><rect x="7" y="26" width="8" height="15" rx="2" fill="var(--accent)" opacity="0.4"/><rect x="20" y="16" width="8" height="25" rx="2" fill="var(--accent)" opacity="0.7"/><rect x="33" y="6" width="8" height="35" rx="2" fill="var(--accent)"/></svg>
         </div>
         <div>
           <h2 class="ob-heading">Budgets that build themselves</h2>
@@ -91,7 +93,7 @@
     <div class="ob-slide" id="obSlide2" data-step="2">
       <div class="ob-slide-content">
         <div class="ob-icon-tile">
-          <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--color-accent, #9184d9)" stroke-width="2.5" opacity="0.3"/><circle cx="24" cy="24" r="12" fill="none" stroke="var(--color-accent, #9184d9)" stroke-width="2.5" opacity="0.6"/><circle cx="24" cy="24" r="5" fill="var(--color-accent, #9184d9)"/></svg>
+          <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--accent)" stroke-width="2.5" opacity="0.3"/><circle cx="24" cy="24" r="12" fill="none" stroke="var(--accent)" stroke-width="2.5" opacity="0.6"/><circle cx="24" cy="24" r="5" fill="var(--accent)"/></svg>
         </div>
         <div>
           <h2 class="ob-heading">Reach goals faster</h2>
@@ -184,7 +186,7 @@
       <div class="balance-label">Total balance</div>
       <div class="balance-row">
         <div class="balance-value" id="homeBalanceVal">$0</div>
-        <svg width="88" height="32" viewBox="0 0 88 32" style="flex-shrink:0"><path id="homeSparkPath" d="" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <svg id="homeSpark" width="96" height="40" viewBox="0 0 96 40" style="flex-shrink:0"></svg>
       </div>
       <div class="balance-change" id="homeBalanceChange" style="display:none"></div>
     </div>
@@ -202,7 +204,7 @@
       </div>
       <div class="safe-legend">
         <div class="safe-legend-item"><div class="safe-legend-dot" style="background:var(--accent)"></div><span>Spending money</span></div>
-        <div class="safe-legend-item"><span>Bill money</span><div class="safe-legend-dot" style="background:var(--neutral-600)"></div></div>
+        <div class="safe-legend-item"><span>Bill money</span><div class="safe-legend-dot" style="background:var(--faint)"></div></div>
       </div>
       <div class="safe-amounts">
         <span id="safeSpendAmt">$0</span>
@@ -215,7 +217,7 @@
       <div class="stat-card">
         <div class="stat-label">Spent this month</div>
         <div class="stat-value" id="homeSpentVal">$0</div>
-        <div class="stat-bar"><div class="stat-bar-fill" id="homeSpentBar" style="width:0%;background:var(--accent-600)"></div></div>
+        <div class="stat-bar"><div class="stat-bar-fill" id="homeSpentBar" style="width:0%;background:var(--accent)"></div></div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Saved this month</div>
@@ -596,7 +598,7 @@
 
     <div class="card ring-row" id="budgetRingCard" style="margin-bottom:20px;display:none">
       <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0">
-        <circle cx="35" cy="35" r="30" fill="none" stroke="var(--neutral-800)" stroke-width="6"></circle>
+        <circle cx="35" cy="35" r="30" fill="none" stroke="var(--surface-2)" stroke-width="6"></circle>
         <circle cx="35" cy="35" r="30" fill="none" stroke="var(--accent)" stroke-width="6" stroke-dasharray="0 999" stroke-linecap="round" transform="rotate(-90 35 35)" id="budgetRingArc"></circle>
       </svg>
       <div>
@@ -1109,7 +1111,7 @@
       </div>
 
       <div class="fade-divider"></div>
-      <button class="primary-btn" id="logoutBtn" style="border-color:var(--neutral-700);color:var(--text-70)">Log out</button>
+      <button class="primary-btn" id="logoutBtn" style="border-color:var(--surface-3);color:var(--sub)">Log out</button>
     </div>
 
   </div>

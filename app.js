@@ -15,16 +15,23 @@ function apiFetch(url, opts = {}) {
 
 // ── Constants ──
 
-// Nocturne accent/neutral ramp values (mirrors CSS tokens)
-const A = { 200:'#e7e5fe', 300:'#d2cefd', 400:'#b5abfc', 500:'#968ae0', 600:'#796cbf', 700:'#5d5294', 800:'#423a6a' };
-const N = { 400:'#b2b6ca', 500:'#9397ab', 600:'#75798c', 700:'#595d6c' };
+// Apple system color palette (used sparingly for small avatars / accents).
+const APPLE = {
+  blue: '#007AFF', green: '#34C759', teal: '#5AC8FA', indigo: '#5856D6',
+  purple: '#AF52DE', pink: '#FF2D55', orange: '#FF9500', red: '#FF3B30',
+  yellow: '#FFCC00', gray: '#8E8E93',
+};
+// Read a live CSS custom property (so charts follow light/dark).
+function cssVar(name) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim() || '#007AFF';
+}
 
 const CATEGORY_COLOR = {
-  'Housing': A[500], 'Food': A[400], 'Transport': N[400],
-  'Entertainment': N[500], 'Shopping': A[600], 'Health': N[400],
-  'Subscriptions': N[500], 'Other expense': N[600],
-  'Salary': A[300], 'Freelance': A[300], 'Business': A[300],
-  'Investment': A[300], 'Other income': A[300],
+  'Housing': APPLE.indigo, 'Food': APPLE.orange, 'Transport': APPLE.blue,
+  'Entertainment': APPLE.pink, 'Shopping': APPLE.purple, 'Health': APPLE.red,
+  'Subscriptions': APPLE.teal, 'Other expense': APPLE.gray,
+  'Salary': APPLE.green, 'Freelance': APPLE.green, 'Business': APPLE.green,
+  'Investment': APPLE.green, 'Other income': APPLE.green,
 };
 
 // Kept so legacy list renderers don't throw; the redesign favors colored
@@ -39,7 +46,7 @@ const CATEGORY_EMOJI = {
 
 // Deterministic tile color + initial for tile-style rows.
 function tileColor(name) {
-  return CATEGORY_COLOR[name] || N[400];
+  return CATEGORY_COLOR[name] || APPLE.gray;
 }
 function tileInitial(str) {
   return (str || '?').trim().charAt(0).toUpperCase();
@@ -182,6 +189,42 @@ function sparkPath(points, w, h, pad) {
   }).join(' ');
 }
 
+// Apple-Stocks-style sparkline: thin accent line with a gradient fade beneath.
+let _sparkSeq = 0;
+function drawSparkline(svgId, points, w, h, pad) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  const line = sparkPath(points, w, h, pad);
+  if (!line) { svg.innerHTML = ''; return; }
+  const area = line + ` L${w},${h} L0,${h} Z`;
+  const gid = 'spg' + (++_sparkSeq);
+  const accent = cssVar('--accent');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+       <stop offset="0" stop-color="${accent}" stop-opacity="0.28"/>
+       <stop offset="1" stop-color="${accent}" stop-opacity="0"/>
+     </linearGradient></defs>
+     <path d="${area}" fill="url(#${gid})"/>
+     <path d="${line}" fill="none" stroke="${accent}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+// Smooth count-up for key numerals (spring-ish ease-out).
+function animateCount(el, to, fmtFn) {
+  if (!el) return;
+  const from = el._cv || 0;
+  el._cv = to;
+  if (from === to) { el.textContent = fmtFn(to); return; }
+  const dur = 650, t0 = performance.now();
+  const ease = x => 1 - Math.pow(1 - x, 3);
+  function frame(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    el.textContent = fmtFn(from + (to - from) * ease(p));
+    if (p < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
 // Home hero: total balance, safe-to-spend split, spent/saved stat row.
 async function loadHomeHero() {
   const [accRes, ovRes, recRes, trendsRes] = await Promise.all([
@@ -199,7 +242,7 @@ async function loadHomeHero() {
   const savings = acc.savingsBalance || 0;
   const totalBalance = checking + savings;
 
-  document.getElementById('homeBalanceVal').textContent = fmt(totalBalance);
+  animateCount(document.getElementById('homeBalanceVal'), totalBalance, fmt);
 
   // Sparkline from 6-month net-worth-ish proxy (running balance via trends net).
   const nets = trends.map(m => m.income - m.expenses);
@@ -208,7 +251,7 @@ async function loadHomeHero() {
   for (let i = nets.length - 1; i >= 0; i--) { series.unshift(running); running -= nets[i]; }
   series.push(totalBalance);
   const sparkPts = series.length >= 2 ? series : [totalBalance, totalBalance];
-  document.getElementById('homeSparkPath').setAttribute('d', sparkPath(sparkPts, 88, 32, 4));
+  drawSparkline('homeSpark', sparkPts, 96, 40, 5);
 
   // Balance change vs first point in series.
   const first = sparkPts[0] || 0;
@@ -216,8 +259,8 @@ async function loadHomeHero() {
   if (first > 0 && totalBalance !== first) {
     const pct = ((totalBalance - first) / first) * 100;
     const up = pct >= 0;
-    changeEl.textContent = `${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% recent trend`;
-    changeEl.style.color = up ? 'var(--accent-400)' : 'var(--text-55)';
+    changeEl.textContent = `${up ? '↑' : '↓'} ${Math.abs(pct).toFixed(1)}% recent trend`;
+    changeEl.style.color = up ? 'var(--green)' : 'var(--muted)';
     changeEl.style.display = '';
   } else {
     changeEl.style.display = 'none';
@@ -229,7 +272,7 @@ async function loadHomeHero() {
     .reduce((s, r) => s + r.amount, 0);
   const safeToSpend = totalBalance - billsReserved;
 
-  document.getElementById('safeToSpendVal').textContent = fmt(safeToSpend);
+  animateCount(document.getElementById('safeToSpendVal'), safeToSpend, fmt);
   document.getElementById('safeSpendAmt').textContent = fmt(Math.max(0, safeToSpend));
   document.getElementById('safeBillsAmt').textContent = fmt(billsReserved);
 
@@ -828,7 +871,7 @@ async function sendMessage() {
 }
 
 // ── Subscriptions ──
-const SUB_COLORS = [A[500], A[400], A[600], N[400], N[500], A[300], A[700], N[600]];
+const SUB_COLORS = [APPLE.blue, APPLE.indigo, APPLE.purple, APPLE.pink, APPLE.orange, APPLE.teal, APPLE.green, APPLE.gray];
 
 function subColor(name) {
   let hash = 0;
@@ -1007,7 +1050,7 @@ async function loadHealthScore() {
   const res = await apiFetch('/api/score');
   const data = await res.json();
   const card = document.getElementById('scoreCard');
-  const gradeColors = { A: A[300], B: A[400], C: A[500], D: N[500], F: N[600] };
+  const gradeColors = { A: APPLE.green, B: APPLE.green, C: APPLE.blue, D: APPLE.orange, F: APPLE.red };
 
   if (!data.ready) {
     card.innerHTML = `<div class="score-unlock">
@@ -1023,7 +1066,7 @@ async function loadHealthScore() {
       <div class="score-number">${data.score}</div>
       <div class="score-label">Financial health</div>
     </div>
-    <div class="score-grade" style="color:${gradeColors[data.grade] || N[400]}">${data.grade}</div>
+    <div class="score-grade" style="color:${gradeColors[data.grade] || APPLE.gray}">${data.grade}</div>
     <div class="score-bars">
       ${Object.values(data.components).map(c => {
         const pct = (c.score / c.max) * 100;
@@ -1508,8 +1551,11 @@ async function loadTrends() {
   const hasData = months.some(m => m.income > 0 || m.expenses > 0);
   if (!hasData) { el.innerHTML = '<div class="empty-state" style="padding:12px 0">No history yet.</div>'; return; }
 
+  const barAccent = cssVar('--accent');
+  const barMuted = cssVar('--surface-3');
+  const barLabel = cssVar('--muted');
   const maxVal = Math.max(...months.map(m => Math.max(m.income, m.expenses)), 1);
-  const H = 80, barW = 10, gapBetween = 3, groupGap = 8;
+  const H = 80, barW = 9, gapBetween = 4, groupGap = 10;
   const groupW = barW * 2 + gapBetween + groupGap;
   const totalW = groupW * months.length - groupGap;
 
@@ -1518,9 +1564,9 @@ async function loadTrends() {
     const incH = (m.income / maxVal) * H;
     const expH = (m.expenses / maxVal) * H;
     return `
-      <rect x="${x}" y="${(H - incH).toFixed(1)}" width="${barW}" height="${incH.toFixed(1)}" fill="${A[500]}" rx="2"/>
-      <rect x="${x + barW + gapBetween}" y="${(H - expH).toFixed(1)}" width="${barW}" height="${expH.toFixed(1)}" fill="${N[600]}" rx="2"/>
-      <text x="${(x + barW + gapBetween / 2).toFixed(1)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="${N[500]}" font-family="Inter,sans-serif">${m.label}</text>`;
+      <rect x="${x}" y="${(H - incH).toFixed(1)}" width="${barW}" height="${incH.toFixed(1)}" fill="${barAccent}" rx="3"/>
+      <rect x="${x + barW + gapBetween}" y="${(H - expH).toFixed(1)}" width="${barW}" height="${expH.toFixed(1)}" fill="${barMuted}" rx="3"/>
+      <text x="${(x + barW + gapBetween / 2).toFixed(1)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="${barLabel}" font-family="inherit">${m.label}</text>`;
   }).join('');
 
   el.innerHTML = `<svg class="trends-svg" viewBox="-2 0 ${totalW + 4} ${H + 20}" width="100%" preserveAspectRatio="none">${bars}</svg>`;
@@ -1881,7 +1927,7 @@ async function loadCreditScores() {
 
 function creditScoreInfo(score) {
   if (score >= 800) return { color: '#16a34a', label: 'Exceptional' };
-  if (score >= 750) return { color: A[400], label: 'Very Good' };
+  if (score >= 750) return { color: APPLE.green, label: 'Very Good' };
   if (score >= 670) return { color: '#f59e0b', label: 'Good' };
   if (score >= 580) return { color: '#f97316', label: 'Fair' };
   return { color: '#ef4444', label: 'Poor' };
@@ -2076,7 +2122,7 @@ document.getElementById('sharedAddBtn').addEventListener('click', async () => {
 
 document.getElementById('sharedShowSettled').addEventListener('change', loadShared);
 
-const PERSON_COLORS = [A[500], A[400], A[600], N[400], N[500], A[300], A[700], N[600]];
+const PERSON_COLORS = [APPLE.blue, APPLE.indigo, APPLE.purple, APPLE.pink, APPLE.orange, APPLE.teal, APPLE.green, APPLE.gray];
 function personColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
