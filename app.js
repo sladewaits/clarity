@@ -2272,6 +2272,83 @@ function openSettingsScreen() {
   const biometric = localStorage.getItem('clarity_pref_biometric') === '1';
   document.getElementById('toggleAlerts').classList.toggle('on', alerts);
   document.getElementById('toggleBiometric').classList.toggle('on', biometric);
+  loadPlaidSettings();
+}
+
+// Render the linked-accounts (Plaid) section in Settings.
+async function loadPlaidSettings() {
+  const section = document.getElementById('plaidSettingsSection');
+  let status;
+  try {
+    const res = await apiFetch('/api/plaid/status');
+    status = await res.json();
+  } catch { status = { enabled: false }; }
+
+  if (!status.enabled) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const body = document.getElementById('plaidStatusBody');
+  const actions = document.getElementById('plaidActionRow');
+
+  if (!status.linked) {
+    body.innerHTML = `<div class="tile-sub" style="font-size:13px;color:var(--text-55)">No bank linked yet.</div>`;
+    actions.innerHTML = `<button class="primary-btn" id="plaidLinkBtn" style="margin-top:12px">Connect a bank account</button>`;
+    document.getElementById('plaidLinkBtn').addEventListener('click', () => linkFromSettings());
+    return;
+  }
+
+  const acctRows = (status.accounts || []).map(a =>
+    `<div class="settings-row" style="padding:8px 0">
+      <div class="settings-label" style="font-weight:400">${a.name}${a.mask ? ' ····' + a.mask : ''}</div>
+      <div class="settings-detail">${fmt(a.balance || 0)}</div>
+    </div>`).join('');
+  const last = status.lastSync ? new Date(status.lastSync).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+  body.innerHTML = `
+    <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:2px">${status.institution || 'Linked bank'}</div>
+    <div class="tile-sub" style="font-size:12px;color:var(--text-45);margin-bottom:8px">Last synced ${last}</div>
+    ${acctRows}`;
+  actions.innerHTML = `
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="primary-btn" id="plaidSyncBtn" style="flex:1">Sync now</button>
+      <button class="primary-btn" id="plaidUnlinkBtn" style="flex:1;border-color:var(--neutral-700);color:var(--text-70)">Unlink</button>
+    </div>`;
+  document.getElementById('plaidSyncBtn').addEventListener('click', async () => {
+    const b = document.getElementById('plaidSyncBtn');
+    b.disabled = true; b.textContent = 'Syncing...';
+    await apiFetch('/api/plaid/sync', { method: 'POST' });
+    await loadPlaidSettings();
+    loadOverview();
+  });
+  document.getElementById('plaidUnlinkBtn').addEventListener('click', async () => {
+    await apiFetch('/api/plaid/unlink', { method: 'POST' });
+    await loadPlaidSettings();
+    loadOverview();
+  });
+}
+
+// Launch Plaid Link from the Settings screen (re-link after onboarding skip).
+async function linkFromSettings() {
+  const btn = document.getElementById('plaidLinkBtn');
+  btn.disabled = true; btn.textContent = 'Opening Plaid...';
+  try {
+    const res = await apiFetch('/api/plaid/create_link_token', { method: 'POST' });
+    const { link_token } = await res.json();
+    if (!link_token || typeof Plaid === 'undefined') throw new Error('no link');
+    Plaid.create({
+      token: link_token,
+      onSuccess: async (public_token, metadata) => {
+        await apiFetch('/api/plaid/exchange_public_token', {
+          method: 'POST',
+          body: JSON.stringify({ public_token, institution: metadata.institution ? metadata.institution.name : null }),
+        });
+        await loadPlaidSettings();
+        loadOverview();
+      },
+      onExit: () => { btn.disabled = false; btn.textContent = 'Connect a bank account'; },
+    }).open();
+  } catch {
+    btn.disabled = false; btn.textContent = 'Connect a bank account';
+  }
 }
 
 document.querySelectorAll('.pill-toggle[data-pref]').forEach(btn => {
@@ -2342,7 +2419,7 @@ function renderBankList() {
   });
 }
 
-function showObStep(step) {
+async function showObStep(step) {
   obStep = step;
   document.querySelectorAll('.ob-slide').forEach(s => s.classList.remove('active'));
   document.getElementById('obConnect').classList.remove('active');
@@ -2350,7 +2427,58 @@ function showObStep(step) {
     document.getElementById('obSlide' + step).classList.add('active');
   } else {
     document.getElementById('obConnect').classList.add('active');
+    await setupConnectStep();
+  }
+}
+
+// Decide between real Plaid Link and the mock bank list based on server config.
+async function setupConnectStep() {
+  const real = document.getElementById('obPlaidReal');
+  const mock = document.getElementById('obMockConnect');
+  let enabled = false;
+  try {
+    const res = await apiFetch('/api/plaid/status');
+    enabled = (await res.json()).enabled;
+  } catch {}
+  if (enabled && typeof Plaid !== 'undefined') {
+    real.style.display = 'flex';
+    mock.style.display = 'none';
+  } else {
+    real.style.display = 'none';
+    mock.style.display = 'flex';
     renderBankList();
+  }
+}
+
+// Launch the real Plaid Link flow, then exchange + sync and enter the app.
+async function launchPlaidLink() {
+  const btn = document.getElementById('obPlaidBtn');
+  btn.disabled = true; btn.textContent = 'Opening Plaid...';
+  try {
+    const res = await apiFetch('/api/plaid/create_link_token', { method: 'POST' });
+    const { link_token, error } = await res.json();
+    if (!link_token) throw new Error(error || 'no link token');
+    const handler = Plaid.create({
+      token: link_token,
+      onSuccess: async (public_token, metadata) => {
+        btn.textContent = 'Linking accounts...';
+        await apiFetch('/api/plaid/exchange_public_token', {
+          method: 'POST',
+          body: JSON.stringify({
+            public_token,
+            institution: metadata.institution ? metadata.institution.name : null,
+          }),
+        });
+        finishOnboarding();
+      },
+      onExit: () => {
+        btn.disabled = false; btn.textContent = 'Connect a bank account';
+      },
+    });
+    handler.open();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Connect a bank account';
+    alert('Could not start Plaid. Please try again.');
   }
 }
 
@@ -2380,6 +2508,8 @@ document.getElementById('obBankSearch').addEventListener('input', renderBankList
 document.getElementById('obContinueBtn').addEventListener('click', () => {
   if (obSelectedBanks.length > 0) finishOnboarding();
 });
+document.getElementById('obPlaidBtn').addEventListener('click', launchPlaidLink);
+document.getElementById('obPlaidSkip').addEventListener('click', finishOnboarding);
 
 // ── Init ──
 async function initApp() {

@@ -11,6 +11,23 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'clarity-secret-change-in-prod';
 
+// ── Plaid ──
+const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
+const PLAID_ENABLED = !!(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET);
+let plaidClient = null;
+if (PLAID_ENABLED) {
+  const plaidEnv = (process.env.PLAID_ENV || 'sandbox').toLowerCase();
+  plaidClient = new PlaidApi(new Configuration({
+    basePath: PlaidEnvironments[plaidEnv] || PlaidEnvironments.sandbox,
+    baseOptions: {
+      headers: {
+        'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+        'PLAID-SECRET': process.env.PLAID_SECRET,
+      },
+    },
+  }));
+}
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
@@ -42,6 +59,7 @@ function mkDefaults() {
     checkingBalance: null, savingsBalance: null,
     creditScores: [], challenges: {}, shared: [], milestones: [],
     freedomTarget: null,
+    plaid: null,
   };
 }
 
@@ -60,6 +78,7 @@ function mergeDefaults(d) {
     shared: d.shared || [],
     milestones: d.milestones || [],
     freedomTarget: d.freedomTarget ?? null,
+    plaid: d.plaid ?? null,
   };
 }
 
@@ -1058,6 +1077,168 @@ app.post('/api/accounts', requireAuth, async (req, res) => {
   if (savingsBalance !== undefined) data.savingsBalance = parseFloat(savingsBalance) || 0;
   await save(data, req.userId);
   res.json({ checkingBalance: data.checkingBalance, savingsBalance: data.savingsBalance });
+});
+
+// ── Plaid ──
+
+// Map a Plaid personal_finance_category / legacy category to our expense buckets.
+function mapPlaidCategory(txn) {
+  const primary = (txn.personal_finance_category?.primary || '').toUpperCase();
+  const map = {
+    INCOME: 'Salary',
+    RENT_AND_UTILITIES: 'Housing',
+    FOOD_AND_DRINK: 'Food',
+    TRANSPORTATION: 'Transport',
+    TRAVEL: 'Transport',
+    ENTERTAINMENT: 'Entertainment',
+    GENERAL_MERCHANDISE: 'Shopping',
+    MEDICAL: 'Health',
+    PERSONAL_CARE: 'Health',
+    LOAN_PAYMENTS: 'Other expense',
+    BANK_FEES: 'Other expense',
+    GENERAL_SERVICES: 'Subscriptions',
+  };
+  return map[primary] || 'Other expense';
+}
+
+// Pull balances + transactions from Plaid and merge into the user's data.
+async function plaidSync(data, userId) {
+  if (!data.plaid?.accessToken) return { added: 0 };
+  const accessToken = data.plaid.accessToken;
+
+  // Balances → checking / savings totals.
+  try {
+    const balResp = await plaidClient.accountsBalanceGet({ access_token: accessToken });
+    const accounts = balResp.data.accounts || [];
+    let checking = 0, savings = 0;
+    accounts.forEach(a => {
+      const bal = a.balances?.current || 0;
+      if (a.subtype === 'checking') checking += bal;
+      else if (a.subtype === 'savings') savings += bal;
+    });
+    if (checking > 0) data.checkingBalance = Math.round(checking * 100) / 100;
+    if (savings > 0) data.savingsBalance = Math.round(savings * 100) / 100;
+    data.plaid.accounts = accounts.map(a => ({
+      id: a.account_id, name: a.name, mask: a.mask,
+      subtype: a.subtype, balance: a.balances?.current || 0,
+    }));
+  } catch (e) {
+    console.error('plaid balance error', e.response?.data || e.message);
+  }
+
+  // Transactions via sync cursor (incremental).
+  let added = 0;
+  try {
+    let cursor = data.plaid.cursor || undefined;
+    let hasMore = true;
+    const existing = new Set(data.transactions.filter(t => t.plaidId).map(t => t.plaidId));
+    while (hasMore) {
+      const resp = await plaidClient.transactionsSync({ access_token: accessToken, cursor });
+      const d = resp.data;
+      d.added.forEach(txn => {
+        if (existing.has(txn.transaction_id)) return;
+        // Plaid: positive amount = money out (expense), negative = money in (income).
+        const isExpense = txn.amount > 0;
+        data.transactions.push({
+          id: Date.now().toString() + Math.random().toString(36).slice(2),
+          plaidId: txn.transaction_id,
+          type: isExpense ? 'expense' : 'income',
+          amount: Math.abs(txn.amount),
+          category: isExpense ? mapPlaidCategory(txn) : 'Other income',
+          description: txn.merchant_name || txn.name || '',
+          recurring: false,
+          date: new Date(txn.date + 'T12:00:00').toISOString(),
+        });
+        existing.add(txn.transaction_id);
+        added++;
+      });
+      // Removed transactions: drop them if we still have them.
+      if (d.removed?.length) {
+        const removedIds = new Set(d.removed.map(r => r.transaction_id));
+        data.transactions = data.transactions.filter(t => !t.plaidId || !removedIds.has(t.plaidId));
+      }
+      cursor = d.next_cursor;
+      hasMore = d.has_more;
+    }
+    data.plaid.cursor = cursor;
+    data.plaid.lastSync = new Date().toISOString();
+  } catch (e) {
+    console.error('plaid tx error', e.response?.data || e.message);
+  }
+
+  return { added };
+}
+
+app.get('/api/plaid/status', requireAuth, async (req, res) => {
+  if (!PLAID_ENABLED) return res.json({ enabled: false, linked: false });
+  const data = await load(req.userId);
+  res.json({
+    enabled: true,
+    linked: !!data.plaid?.accessToken,
+    institution: data.plaid?.institution || null,
+    accounts: data.plaid?.accounts || [],
+    lastSync: data.plaid?.lastSync || null,
+  });
+});
+
+app.post('/api/plaid/create_link_token', requireAuth, async (req, res) => {
+  if (!PLAID_ENABLED) return res.status(501).json({ error: 'Plaid not configured' });
+  try {
+    const resp = await plaidClient.linkTokenCreate({
+      user: { client_user_id: req.userId },
+      client_name: 'Clarity',
+      products: ['transactions'],
+      country_codes: ['US'],
+      language: 'en',
+    });
+    res.json({ link_token: resp.data.link_token });
+  } catch (e) {
+    console.error('link token error', e.response?.data || e.message);
+    res.status(500).json({ error: 'Could not create link token' });
+  }
+});
+
+app.post('/api/plaid/exchange_public_token', requireAuth, async (req, res) => {
+  if (!PLAID_ENABLED) return res.status(501).json({ error: 'Plaid not configured' });
+  const { public_token, institution } = req.body;
+  if (!public_token) return res.status(400).json({ error: 'Missing public_token' });
+  try {
+    const exch = await plaidClient.itemPublicTokenExchange({ public_token });
+    const data = await load(req.userId);
+    data.plaid = {
+      accessToken: exch.data.access_token,
+      itemId: exch.data.item_id,
+      institution: institution || null,
+      cursor: null,
+      accounts: [],
+      lastSync: null,
+    };
+    const { added } = await plaidSync(data, req.userId);
+    await save(data, req.userId);
+    res.json({ linked: true, imported: added, accounts: data.plaid.accounts });
+  } catch (e) {
+    console.error('exchange error', e.response?.data || e.message);
+    res.status(500).json({ error: 'Could not link account' });
+  }
+});
+
+app.post('/api/plaid/sync', requireAuth, async (req, res) => {
+  if (!PLAID_ENABLED) return res.status(501).json({ error: 'Plaid not configured' });
+  const data = await load(req.userId);
+  if (!data.plaid?.accessToken) return res.status(400).json({ error: 'No linked account' });
+  const { added } = await plaidSync(data, req.userId);
+  await save(data, req.userId);
+  res.json({ imported: added, accounts: data.plaid.accounts, lastSync: data.plaid.lastSync });
+});
+
+app.post('/api/plaid/unlink', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
+  if (data.plaid?.accessToken && PLAID_ENABLED) {
+    try { await plaidClient.itemRemove({ access_token: data.plaid.accessToken }); } catch {}
+  }
+  data.plaid = null;
+  await save(data, req.userId);
+  res.json({ linked: false });
 });
 
 // Paydays

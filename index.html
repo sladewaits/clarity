@@ -109,14 +109,30 @@
 
     <div class="ob-connect" id="obConnect">
       <h2 class="ob-heading">Connect with Plaid</h2>
-      <div class="ob-connect-sub">Plaid securely links your accounts in seconds. Search or pick your bank below — every major U.S. bank and credit union is supported.</div>
-      <input class="form-input" id="obBankSearch" placeholder="Search any U.S. bank or credit union" style="flex-shrink:0" />
-      <div class="ob-bank-list" id="obBankList"></div>
-      <div class="ob-security">
-        <svg width="12" height="14" viewBox="0 0 12 14"><path d="M2 6V4a4 4 0 018 0v2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1" y="6" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
-        <span>Secured by Plaid · bank-level encryption</span>
+      <div class="ob-connect-sub">Plaid securely links your accounts in seconds — every major U.S. bank and credit union is supported.</div>
+
+      <!-- Real Plaid Link path (shown when Plaid is configured) -->
+      <div id="obPlaidReal" style="display:none;flex:1;flex-direction:column">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center">
+          <div class="ob-icon-tile">
+            <svg width="48" height="48" viewBox="0 0 48 48"><rect x="6" y="10" width="36" height="28" rx="4" fill="none" stroke="var(--accent)" stroke-width="2.5"/><line x1="6" y1="19" x2="42" y2="19" stroke="var(--accent)" stroke-width="2.5"/></svg>
+          </div>
+          <div class="ob-body" style="max-width:280px">Tap below to securely link a bank account. Your credentials are handled by Plaid and never stored by Clarity.</div>
+        </div>
+        <button class="primary-btn" id="obPlaidBtn" style="flex-shrink:0">Connect a bank account</button>
+        <button class="ob-skip" id="obPlaidSkip" style="align-self:center;margin-top:14px">Skip for now</button>
       </div>
-      <button class="primary-btn" id="obContinueBtn" style="margin-top:8px;flex-shrink:0" disabled>Continue</button>
+
+      <!-- Mock fallback (shown when Plaid is not configured) -->
+      <div id="obMockConnect" style="display:none;flex:1;flex-direction:column;min-height:0">
+        <input class="form-input" id="obBankSearch" placeholder="Search any U.S. bank or credit union" style="flex-shrink:0" />
+        <div class="ob-bank-list" id="obBankList"></div>
+        <div class="ob-security">
+          <svg width="12" height="14" viewBox="0 0 12 14"><path d="M2 6V4a4 4 0 018 0v2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1" y="6" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+          <span>Secured by Plaid · bank-level encryption</span>
+        </div>
+        <button class="primary-btn" id="obContinueBtn" style="margin-top:8px;flex-shrink:0" disabled>Continue</button>
+      </div>
     </div>
   </div>
 
@@ -1071,6 +1087,15 @@
         <button class="primary-btn" id="saveProfileBtn">Save profile</button>
       </div>
 
+      <!-- Connected accounts (Plaid) -->
+      <div id="plaidSettingsSection" style="display:none">
+        <div class="section-label">Linked accounts</div>
+        <div class="card" style="margin-bottom:20px">
+          <div id="plaidStatusBody"></div>
+          <div id="plaidActionRow"></div>
+        </div>
+      </div>
+
       <div class="section-label">Preferences</div>
       <div class="tile-list" style="margin-bottom:20px">
         <div class="settings-row">
@@ -1105,6 +1130,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
