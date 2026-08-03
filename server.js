@@ -725,6 +725,7 @@ app.post('/api/recurring', requireAuth, async (req, res) => {
     type, amount: parseFloat(amount), category,
     description: description || '', frequency,
     nextDate: startDate || new Date().toISOString().split('T')[0],
+    autopay: false,
   };
   data.recurring.push(item);
   await save(data, req.userId);
@@ -736,6 +737,17 @@ app.delete('/api/recurring/:id', requireAuth, async (req, res) => {
   data.recurring = data.recurring.filter(r => r.id !== req.params.id);
   await save(data, req.userId);
   res.json({ ok: true });
+});
+
+// Toggle a recurring bill's autopay flag (does not change the reserved amount —
+// the obligation is still due either way).
+app.post('/api/recurring/:id/autopay', requireAuth, async (req, res) => {
+  const data = await load(req.userId);
+  const item = data.recurring.find(r => r.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  item.autopay = !item.autopay;
+  await save(data, req.userId);
+  res.json({ id: item.id, autopay: item.autopay });
 });
 
 app.post('/api/recurring/log', requireAuth, async (req, res) => {

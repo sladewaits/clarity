@@ -15,13 +15,35 @@ function apiFetch(url, opts = {}) {
 
 // ── Constants ──
 
+// Nocturne accent/neutral ramp values (mirrors CSS tokens)
+const A = { 200:'#e7e5fe', 300:'#d2cefd', 400:'#b5abfc', 500:'#968ae0', 600:'#796cbf', 700:'#5d5294', 800:'#423a6a' };
+const N = { 400:'#b2b6ca', 500:'#9397ab', 600:'#75798c', 700:'#595d6c' };
+
 const CATEGORY_COLOR = {
-  'Housing': '#6366f1', 'Food': '#f59e0b', 'Transport': '#3b82f6',
-  'Entertainment': '#ec4899', 'Shopping': '#8b5cf6', 'Health': '#ef4444',
-  'Subscriptions': '#14b8a6', 'Other expense': '#9ca3af',
-  'Salary': '#22c55e', 'Freelance': '#22c55e', 'Business': '#22c55e',
-  'Investment': '#22c55e', 'Other income': '#22c55e',
+  'Housing': A[500], 'Food': A[400], 'Transport': N[400],
+  'Entertainment': N[500], 'Shopping': A[600], 'Health': N[400],
+  'Subscriptions': N[500], 'Other expense': N[600],
+  'Salary': A[300], 'Freelance': A[300], 'Business': A[300],
+  'Investment': A[300], 'Other income': A[300],
 };
+
+// Kept so legacy list renderers don't throw; the redesign favors colored
+// initial tiles over emoji, but a few secondary lists still read this.
+const CATEGORY_EMOJI = {
+  'Housing': '🏠', 'Food': '🍽️', 'Transport': '🚗',
+  'Entertainment': '🎬', 'Shopping': '🛍️', 'Health': '⚕️',
+  'Subscriptions': '🔁', 'Other expense': '📦',
+  'Salary': '💼', 'Freelance': '💻', 'Business': '🏢',
+  'Investment': '📈', 'Other income': '💰',
+};
+
+// Deterministic tile color + initial for tile-style rows.
+function tileColor(name) {
+  return CATEGORY_COLOR[name] || N[400];
+}
+function tileInitial(str) {
+  return (str || '?').trim().charAt(0).toUpperCase();
+}
 
 // ── Month state ──
 const now = new Date();
@@ -64,6 +86,14 @@ document.getElementById('nextMonth').addEventListener('click', () => {
 
 // ── Tab switching ──
 let activeTab = 'overview';
+
+function onTabShown(tab) {
+  if (tab === 'overview') loadOverview();
+  if (tab === 'transactions') { loadTransactions(); loadRecurring(); }
+  if (tab === 'budget') loadBudgets();
+  if (tab === 'goals') loadGoals();
+}
+
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
@@ -72,10 +102,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
     activeTab = tab;
-    if (tab === 'overview') loadOverview();
-    if (tab === 'transactions') { loadTransactions(); loadRecurring(); }
-    if (tab === 'plan') { loadBudgets(); loadGoals(); }
-    if (tab === 'calendar') loadCalendar();
+    onTabShown(tab);
   });
 });
 
@@ -87,10 +114,7 @@ function switchTab(tab) {
   const panel = document.getElementById('tab-' + tab);
   if (panel) panel.classList.add('active');
   activeTab = tab;
-  if (tab === 'overview') loadOverview();
-  if (tab === 'transactions') { loadTransactions(); loadRecurring(); }
-  if (tab === 'plan') { loadBudgets(); loadGoals(); }
-  if (tab === 'calendar') loadCalendar();
+  onTabShown(tab);
 }
 
 document.getElementById('quickAddIncome').addEventListener('click', () => {
@@ -118,6 +142,23 @@ function loadGreeting() {
   document.getElementById('greetingAvatar').textContent = userInitial();
 }
 
+function txTileRow(tx) {
+  const name = tx.description || tx.category;
+  const color = tileColor(tx.category);
+  const initial = tileInitial(name);
+  const isIncome = tx.type === 'income';
+  const amtClass = isIncome ? 'positive' : 'negative';
+  const sign = isIncome ? '+' : '-';
+  return `<div class="tile-row">
+    <div class="tile-avatar" style="background:${color}">${initial}</div>
+    <div class="tile-info">
+      <div class="tile-name">${name}</div>
+      <div class="tile-sub">${tx.category}</div>
+    </div>
+    <div class="tile-amount ${amtClass}">${sign}${fmt(tx.amount)}</div>
+  </div>`;
+}
+
 async function loadRecentTxs() {
   const res = await apiFetch('/api/transactions');
   const txs = await res.json();
@@ -125,55 +166,130 @@ async function loadRecentTxs() {
   const card = document.getElementById('recentTxCard');
   if (!recent.length) { card.style.display = 'none'; return; }
   card.style.display = '';
-  document.getElementById('recentTxList').innerHTML = recent.map(tx => {
-    const sign = tx.type === 'income' ? '+' : '-';
-    const color = tx.type === 'income' ? '#22c55e' : '#f87171';
-    const date = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const desc = tx.description || tx.category;
-    return `<div class="recent-tx-row">
-      <span class="recent-tx-desc">${desc}</span>
-      <span class="recent-tx-date">${date}</span>
-      <span class="recent-tx-amt" style="color:${color}">${sign}$${tx.amount.toFixed(2)}</span>
-    </div>`;
-  }).join('');
+  document.getElementById('recentTxList').innerHTML = recent.map(txTileRow).join('');
 }
 
-// ── Plan tab segments ──
-const ALL_PLAN_SECTIONS = ['planBudgets','planGoals','planSubscriptions','planNetworth','planDebt','planCredit','planTax','planChallenges','planShared'];
+// Build an SVG path from a numeric series (matches design sparkline).
+function sparkPath(points, w, h, pad) {
+  if (!points.length) return '';
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const step = points.length > 1 ? w / (points.length - 1) : 0;
+  return points.map((v, i) => {
+    const x = i * step;
+    const y = pad + (h - pad * 2) * (1 - (v - min) / range);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+}
 
-document.querySelectorAll('.plan-seg').forEach(btn => {
+// Home hero: total balance, safe-to-spend split, spent/saved stat row.
+async function loadHomeHero() {
+  const [accRes, ovRes, recRes, trendsRes] = await Promise.all([
+    apiFetch('/api/accounts'),
+    apiFetch(`/api/overview?month=${monthStr()}`),
+    apiFetch('/api/recurring'),
+    apiFetch('/api/trends'),
+  ]);
+  const acc = await accRes.json();
+  const ov = await ovRes.json();
+  const rec = await recRes.json();
+  const trends = await trendsRes.json();
+
+  const checking = acc.checkingBalance || 0;
+  const savings = acc.savingsBalance || 0;
+  const totalBalance = checking + savings;
+
+  document.getElementById('homeBalanceVal').textContent = fmt(totalBalance);
+
+  // Sparkline from 6-month net-worth-ish proxy (running balance via trends net).
+  const nets = trends.map(m => m.income - m.expenses);
+  let running = totalBalance;
+  const series = [];
+  for (let i = nets.length - 1; i >= 0; i--) { series.unshift(running); running -= nets[i]; }
+  series.push(totalBalance);
+  const sparkPts = series.length >= 2 ? series : [totalBalance, totalBalance];
+  document.getElementById('homeSparkPath').setAttribute('d', sparkPath(sparkPts, 88, 32, 4));
+
+  // Balance change vs first point in series.
+  const first = sparkPts[0] || 0;
+  const changeEl = document.getElementById('homeBalanceChange');
+  if (first > 0 && totalBalance !== first) {
+    const pct = ((totalBalance - first) / first) * 100;
+    const up = pct >= 0;
+    changeEl.textContent = `${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% recent trend`;
+    changeEl.style.color = up ? 'var(--accent-400)' : 'var(--text-55)';
+    changeEl.style.display = '';
+  } else {
+    changeEl.style.display = 'none';
+  }
+
+  // Bills reserved = sum of recurring expense amounts (obligations, incl. autopay).
+  const billsReserved = (rec.recurring || [])
+    .filter(r => r.type === 'expense')
+    .reduce((s, r) => s + r.amount, 0);
+  const safeToSpend = totalBalance - billsReserved;
+
+  document.getElementById('safeToSpendVal').textContent = fmt(safeToSpend);
+  document.getElementById('safeSpendAmt').textContent = fmt(Math.max(0, safeToSpend));
+  document.getElementById('safeBillsAmt').textContent = fmt(billsReserved);
+
+  const denom = totalBalance > 0 ? totalBalance : (Math.max(0, safeToSpend) + billsReserved) || 1;
+  const spendPct = Math.max(0, Math.min(100, (Math.max(0, safeToSpend) / denom) * 100));
+  const billsPct = Math.max(0, Math.min(100, (billsReserved / denom) * 100));
+  document.getElementById('safeBarSpend').style.width = spendPct + '%';
+  document.getElementById('safeBarBills').style.width = billsPct + '%';
+
+  // Spent / saved this month.
+  const spent = ov.expenses || 0;
+  const saved = Math.max(0, ov.net || 0);
+  document.getElementById('homeSpentVal').textContent = fmt(spent);
+  document.getElementById('homeSavedVal').textContent = fmt(saved);
+  const spentDenom = (ov.income || 0) > 0 ? ov.income : (spent || 1);
+  document.getElementById('homeSpentBar').style.width = Math.min(100, (spent / spentDenom) * 100) + '%';
+  document.getElementById('homeSavedBar').style.width = Math.min(100, (ov.income > 0 ? (saved / ov.income) * 100 : 0)) + '%';
+}
+
+// ── Activity filter segments ──
+let txFilter = 'all';
+document.querySelectorAll('#txFilterSegs .plan-seg').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.plan-seg').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#txFilterSegs .plan-seg').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    const seg = btn.dataset.seg;
-
-    ALL_PLAN_SECTIONS.forEach(id => {
-      document.getElementById(id).style.display = 'none';
-    });
-
-    const segMap = {
-      budgets: 'planBudgets',
-      goals: 'planGoals',
-      subscriptions: 'planSubscriptions',
-      networth: 'planNetworth',
-      debt: 'planDebt',
-      credit: 'planCredit',
-      tax: 'planTax',
-      challenges: 'planChallenges',
-      shared: 'planShared',
-    };
-
-    if (segMap[seg]) document.getElementById(segMap[seg]).style.display = '';
-
-    if (seg === 'subscriptions') loadSubscriptions();
-    if (seg === 'networth') loadNetWorth();
-    if (seg === 'debt') loadDebtPlanner();
-    if (seg === 'credit') loadCreditScores();
-    if (seg === 'tax') loadTaxEstimator();
-    if (seg === 'challenges') loadChallenges();
-    if (seg === 'shared') loadShared();
+    txFilter = btn.dataset.txfilter;
+    loadTransactions();
   });
 });
+
+// ── More tab navigation ──
+document.querySelectorAll('.more-row').forEach(row => {
+  row.addEventListener('click', () => openMoreScreen(row.dataset.more));
+});
+document.querySelectorAll('.subscreen [data-back]').forEach(btn => {
+  btn.addEventListener('click', closeMoreScreen);
+});
+
+function openMoreScreen(key) {
+  document.getElementById('moreList').style.display = 'none';
+  document.querySelectorAll('.subscreen').forEach(s => s.style.display = 'none');
+  const el = document.getElementById('subscreen-' + key);
+  if (!el) return;
+  el.style.display = key === 'chat' ? 'flex' : 'block';
+
+  if (key === 'bills') loadBillsSubscriptions();
+  if (key === 'networth') loadNetWorth();
+  if (key === 'debt') loadDebtPlanner();
+  if (key === 'credit') loadCreditScores();
+  if (key === 'tax') loadTaxEstimator();
+  if (key === 'challenges') loadChallenges();
+  if (key === 'shared') loadShared();
+  if (key === 'calendar') { updateCalMonthLabel(); loadCalendar(); }
+  if (key === 'settings') openSettingsScreen();
+}
+
+function closeMoreScreen() {
+  document.querySelectorAll('.subscreen').forEach(s => s.style.display = 'none');
+  document.getElementById('moreList').style.display = '';
+}
 
 // ── Helpers ──
 function fmt(n) {
@@ -329,7 +445,6 @@ function closeCategorySheet() {
 }
 
 async function openCategorySheet(category) {
-  document.getElementById('catSheetEmoji').textContent = CATEGORY_EMOJI[category] || '📦';
   document.getElementById('catSheetName').textContent = category;
   document.getElementById('catSheetTotal').textContent = '';
   document.getElementById('catSheetMonth').textContent = monthLabel(viewYear, viewMonth);
@@ -424,8 +539,11 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 
 async function loadTransactions() {
   const res = await apiFetch(`/api/transactions?month=${monthStr()}`);
-  const txs = await res.json();
+  let txs = await res.json();
   const list = document.getElementById('txList');
+
+  if (txFilter === 'income') txs = txs.filter(t => t.type === 'income');
+  else if (txFilter === 'expenses') txs = txs.filter(t => t.type === 'expense');
 
   if (!txs.length) {
     list.innerHTML = '<div class="empty-state">No transactions this month.</div>';
@@ -435,19 +553,25 @@ async function loadTransactions() {
   const groups = groupByDate(txs);
   list.innerHTML = groups.map(group => `
     <div class="tx-date-group">
-      <div class="tx-date-label">${group.label}</div>
-      ${group.items.map(tx => {
-        const emoji = CATEGORY_EMOJI[tx.category] || '📦';
-        return `<div class="tx-item">
-          <div class="tx-icon">${emoji}</div>
-          <div class="tx-info">
-            <div class="tx-cat">${tx.category}${tx.recurring ? '<span class="tx-recurring-tag">Recurring</span>' : ''}</div>
-            ${tx.description ? `<div class="tx-desc">${tx.description}</div>` : ''}
-          </div>
-          <div class="tx-amount ${tx.type}">${tx.type === 'income' ? '+' : '-'}${fmt(tx.amount)}</div>
-          <button class="tx-delete" data-id="${tx.id}" title="Delete">×</button>
-        </div>`;
-      }).join('')}
+      <div class="day-group-label">${group.label}</div>
+      <div class="tile-list">
+        ${group.items.map(tx => {
+          const name = tx.description || tx.category;
+          const color = tileColor(tx.category);
+          const initial = tileInitial(name);
+          const isIncome = tx.type === 'income';
+          const sign = isIncome ? '+' : '-';
+          return `<div class="tile-row">
+            <div class="tile-avatar" style="background:${color}">${initial}</div>
+            <div class="tile-info">
+              <div class="tile-name">${name}${tx.recurring ? ' <span class="tx-recurring-tag">Recurring</span>' : ''}</div>
+              <div class="tile-sub">${tx.category}</div>
+            </div>
+            <div class="tile-amount ${isIncome ? 'positive' : 'negative'}">${sign}${fmt(tx.amount)}</div>
+            <button class="tx-delete" data-id="${tx.id}" title="Delete">×</button>
+          </div>`;
+        }).join('')}
+      </div>
     </div>
   `).join('');
 
@@ -484,13 +608,27 @@ async function loadBudgets() {
   const overview = await oRes.json();
 
   const list = document.getElementById('budgetList');
+  const ringCard = document.getElementById('budgetRingCard');
   if (!budgets.length) {
     list.innerHTML = '<div class="empty-state">No budgets set yet.</div>';
+    if (ringCard) ringCard.style.display = 'none';
     return;
   }
 
   const spentMap = {};
   overview.budgetStatus.forEach(b => { spentMap[b.category] = b.spent; });
+
+  // Summary ring: total spent / total budget.
+  if (ringCard) {
+    const totalLimit = budgets.reduce((s, b) => s + b.limit, 0);
+    const totalSpent = budgets.reduce((s, b) => s + (spentMap[b.category] || 0), 0);
+    const ringPct = totalLimit > 0 ? Math.min(totalSpent / totalLimit, 1) : 0;
+    const circ = 2 * Math.PI * 30;
+    document.getElementById('budgetRingArc').setAttribute('stroke-dasharray', `${(ringPct * circ).toFixed(1)} ${circ.toFixed(1)}`);
+    document.getElementById('budgetRingLabel').textContent = `Spent of ${fmt(totalLimit)} budget`;
+    document.getElementById('budgetRingTotal').textContent = fmt(totalSpent);
+    ringCard.style.display = 'flex';
+  }
 
   list.innerHTML = budgets.map(b => {
     const spent = spentMap[b.category] || 0;
@@ -690,7 +828,7 @@ async function sendMessage() {
 }
 
 // ── Subscriptions ──
-const SUB_COLORS = ['#22c55e','#3b82f6','#8b5cf6','#ec4899','#f59e0b','#14b8a6','#ef4444','#6366f1'];
+const SUB_COLORS = [A[500], A[400], A[600], N[400], N[500], A[300], A[700], N[600]];
 
 function subColor(name) {
   let hash = 0;
@@ -736,6 +874,60 @@ document.getElementById('subSubmitBtn').addEventListener('click', async () => {
   document.getElementById('subNextBilling').value = '';
   loadSubscriptions();
 });
+
+// Bills & Subscriptions screen combines recurring expenses (bills, with
+// autopay toggle) and tracked subscriptions.
+async function loadBillsSubscriptions() {
+  loadBills();
+  loadSubscriptions();
+}
+
+async function loadBills() {
+  const res = await apiFetch('/api/recurring');
+  const { recurring } = await res.json();
+  const bills = (recurring || []).filter(r => r.type === 'expense');
+  const list = document.getElementById('billsList');
+
+  if (!bills.length) {
+    list.innerHTML = '<div class="empty-state">No bills yet. Add recurring expenses in Activity.</div>';
+    return;
+  }
+
+  const sorted = [...bills].sort((a, b) => (a.nextDate || '').localeCompare(b.nextDate || ''));
+  list.innerHTML = sorted.map(b => {
+    const name = b.description || b.category;
+    const color = tileColor(b.category);
+    const initial = tileInitial(name);
+    let due = '';
+    if (b.nextDate) {
+      const d = new Date(b.nextDate + 'T00:00:00');
+      const dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const days = daysUntil(b.nextDate);
+      if (days < 0) due = `Due ${dateLabel} · overdue`;
+      else if (days === 0) due = `Due ${dateLabel} · today`;
+      else due = `Due ${dateLabel} · in ${days} day${days !== 1 ? 's' : ''}`;
+    }
+    return `<div class="tile-row">
+      <div class="tile-avatar" style="background:${color}">${initial}</div>
+      <div class="tile-info">
+        <div class="tile-name">${name}</div>
+        <div class="tile-sub">${due}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="tile-amount negative" style="margin-bottom:4px">${fmt(b.amount)}</div>
+        <button class="pill-toggle ${b.autopay ? 'on' : ''}" data-bill="${b.id}" title="Autopay"><div class="knob"></div></button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.pill-toggle[data-bill]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.classList.toggle('on');
+      await apiFetch(`/api/recurring/${btn.dataset.bill}/autopay`, { method: 'POST' });
+      loadHomeHero();
+    });
+  });
+}
 
 async function loadSubscriptions() {
   const res = await apiFetch('/api/subscriptions');
@@ -815,7 +1007,7 @@ async function loadHealthScore() {
   const res = await apiFetch('/api/score');
   const data = await res.json();
   const card = document.getElementById('scoreCard');
-  const gradeColors = { A: '#22c55e', B: '#84cc16', C: '#f59e0b', D: '#f97316', F: '#ef4444' };
+  const gradeColors = { A: A[300], B: A[400], C: A[500], D: N[500], F: N[600] };
 
   if (!data.ready) {
     card.innerHTML = `<div class="score-unlock">
@@ -831,7 +1023,7 @@ async function loadHealthScore() {
       <div class="score-number">${data.score}</div>
       <div class="score-label">Financial health</div>
     </div>
-    <div class="score-grade" style="color:${gradeColors[data.grade] || '#9ca3af'}">${data.grade}</div>
+    <div class="score-grade" style="color:${gradeColors[data.grade] || N[400]}">${data.grade}</div>
     <div class="score-bars">
       ${Object.values(data.components).map(c => {
         const pct = (c.score / c.max) * 100;
@@ -1326,9 +1518,9 @@ async function loadTrends() {
     const incH = (m.income / maxVal) * H;
     const expH = (m.expenses / maxVal) * H;
     return `
-      <rect x="${x}" y="${(H - incH).toFixed(1)}" width="${barW}" height="${incH.toFixed(1)}" fill="#22c55e" rx="2"/>
-      <rect x="${x + barW + gapBetween}" y="${(H - expH).toFixed(1)}" width="${barW}" height="${expH.toFixed(1)}" fill="#ef4444" rx="2"/>
-      <text x="${(x + barW + gapBetween / 2).toFixed(1)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="#9ca3af" font-family="Inter,sans-serif">${m.label}</text>`;
+      <rect x="${x}" y="${(H - incH).toFixed(1)}" width="${barW}" height="${incH.toFixed(1)}" fill="${A[500]}" rx="2"/>
+      <rect x="${x + barW + gapBetween}" y="${(H - expH).toFixed(1)}" width="${barW}" height="${expH.toFixed(1)}" fill="${N[600]}" rx="2"/>
+      <text x="${(x + barW + gapBetween / 2).toFixed(1)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="${N[500]}" font-family="Inter,sans-serif">${m.label}</text>`;
   }).join('');
 
   el.innerHTML = `<svg class="trends-svg" viewBox="-2 0 ${totalW + 4} ${H + 20}" width="100%" preserveAspectRatio="none">${bars}</svg>`;
@@ -1689,7 +1881,7 @@ async function loadCreditScores() {
 
 function creditScoreInfo(score) {
   if (score >= 800) return { color: '#16a34a', label: 'Exceptional' };
-  if (score >= 750) return { color: '#22c55e', label: 'Very Good' };
+  if (score >= 750) return { color: A[400], label: 'Very Good' };
   if (score >= 670) return { color: '#f59e0b', label: 'Good' };
   if (score >= 580) return { color: '#f97316', label: 'Fair' };
   return { color: '#ef4444', label: 'Poor' };
@@ -1884,7 +2076,7 @@ document.getElementById('sharedAddBtn').addEventListener('click', async () => {
 
 document.getElementById('sharedShowSettled').addEventListener('change', loadShared);
 
-const PERSON_COLORS = ['#22c55e','#3b82f6','#8b5cf6','#ec4899','#f59e0b','#14b8a6','#ef4444','#6366f1'];
+const PERSON_COLORS = [A[500], A[400], A[600], N[400], N[500], A[300], A[700], N[600]];
 function personColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -1984,6 +2176,7 @@ const _origLoadOverview = loadOverview;
 loadOverview = async function () {
   loadGreeting();
   loadAccounts();
+  loadHomeHero();
   await _origLoadOverview();
   loadAlerts();
   loadUpcoming();
@@ -2059,24 +2252,34 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   localStorage.removeItem('clarity_token');
   authToken = null;
   currentUser = null;
-  document.getElementById('profileSheet').classList.remove('open');
   document.getElementById('authLogin').style.display = '';
   document.getElementById('authRegister').style.display = 'none';
+  closeMoreScreen();
   showAuth();
 });
 
-// ── Profile panel ──
-document.getElementById('profileBtn').addEventListener('click', () => {
+// ── Settings screen ──
+function openSettingsScreen() {
   if (!currentUser) return;
   document.getElementById('profileName').value = currentUser.name || '';
   document.getElementById('profileIncomeGoal').value = currentUser.monthlyIncomeGoal || '';
   document.getElementById('profileSavingsRate').value = currentUser.targetSavingsRate || 20;
   document.getElementById('profileBigAvatar').textContent = userInitial();
-  document.getElementById('profileSheet').classList.add('open');
-});
+  document.getElementById('settingsProfileName').textContent = currentUser.name || '';
+  document.getElementById('settingsProfileEmail').textContent = currentUser.email || '';
+  // Client-only preference toggles.
+  const alerts = localStorage.getItem('clarity_pref_alerts') !== '0';
+  const biometric = localStorage.getItem('clarity_pref_biometric') === '1';
+  document.getElementById('toggleAlerts').classList.toggle('on', alerts);
+  document.getElementById('toggleBiometric').classList.toggle('on', biometric);
+}
 
-document.getElementById('profileSheetBackdrop').addEventListener('click', () => {
-  document.getElementById('profileSheet').classList.remove('open');
+document.querySelectorAll('.pill-toggle[data-pref]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('on');
+    const on = btn.classList.contains('on');
+    localStorage.setItem('clarity_pref_' + btn.dataset.pref, on ? '1' : '0');
+  });
 });
 
 document.getElementById('saveProfileBtn').addEventListener('click', async () => {
@@ -2084,15 +2287,98 @@ document.getElementById('saveProfileBtn').addEventListener('click', async () => 
   const monthlyIncomeGoal = parseFloat(document.getElementById('profileIncomeGoal').value) || 0;
   const targetSavingsRate = parseFloat(document.getElementById('profileSavingsRate').value) || 20;
 
+  const btn = document.getElementById('saveProfileBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
   const res = await apiFetch('/auth/profile', {
     method: 'PUT',
     body: JSON.stringify({ name, monthlyIncomeGoal, targetSavingsRate }),
   });
   const updated = await res.json();
   currentUser = { ...currentUser, ...updated };
-  document.getElementById('headerAvatar').textContent = userInitial();
-  document.getElementById('headerName').textContent = name;
-  document.getElementById('profileSheet').classList.remove('open');
+  btn.disabled = false; btn.textContent = 'Save profile';
+  document.getElementById('settingsProfileName').textContent = name;
+  document.getElementById('greetingName').textContent = (name || '').split(' ')[0];
+  document.getElementById('greetingAvatar').textContent = userInitial();
+  document.getElementById('profileBigAvatar').textContent = userInitial();
+});
+
+// ══════════════════════════════════════════════
+// Onboarding (intro slides + Plaid-style bank connect)
+// ══════════════════════════════════════════════
+const BANKS = [
+  'Chase','Bank of America','Wells Fargo','Citibank','Capital One','U.S. Bank',
+  'PNC Bank','Truist','TD Bank','Fifth Third Bank','Ally Bank','Chime',
+  'American Express','Discover Bank','Charles Schwab Bank','USAA',
+  'Navy Federal Credit Union','SoFi','Regions Bank','KeyBank','Huntington Bank',
+  'Citizens Bank','M&T Bank','BMO Bank','Santander Bank','VyStar Credit Union',
+];
+let obStep = 0;
+let obSelectedBanks = [];
+
+function renderBankList() {
+  const query = document.getElementById('obBankSearch').value.trim().toLowerCase();
+  const pool = query ? BANKS.filter(b => b.toLowerCase().includes(query)) : BANKS;
+  const listEl = document.getElementById('obBankList');
+  if (!pool.length) {
+    listEl.innerHTML = '<div class="ob-bank-empty">No bank matched. Try a different name.</div>';
+    return;
+  }
+  listEl.innerHTML = pool.map(name => {
+    const selected = obSelectedBanks.includes(name);
+    return `<div class="ob-bank-row ${selected ? 'selected' : ''}" data-bank="${name}">
+      <div class="ob-bank-logo">${name.charAt(0)}</div>
+      <div class="ob-bank-name">${name}</div>
+      <div class="ob-bank-check"></div>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.ob-bank-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const b = row.dataset.bank;
+      if (obSelectedBanks.includes(b)) obSelectedBanks = obSelectedBanks.filter(x => x !== b);
+      else obSelectedBanks.push(b);
+      row.classList.toggle('selected');
+      document.getElementById('obContinueBtn').disabled = obSelectedBanks.length === 0;
+    });
+  });
+}
+
+function showObStep(step) {
+  obStep = step;
+  document.querySelectorAll('.ob-slide').forEach(s => s.classList.remove('active'));
+  document.getElementById('obConnect').classList.remove('active');
+  if (step < 3) {
+    document.getElementById('obSlide' + step).classList.add('active');
+  } else {
+    document.getElementById('obConnect').classList.add('active');
+    renderBankList();
+  }
+}
+
+function startOnboarding() {
+  obStep = 0;
+  obSelectedBanks = [];
+  document.getElementById('obBankSearch').value = '';
+  document.getElementById('obContinueBtn').disabled = true;
+  showObStep(0);
+  document.getElementById('onboardingOverlay').classList.add('open');
+}
+
+function finishOnboarding() {
+  document.getElementById('onboardingOverlay').classList.remove('open');
+  localStorage.setItem('clarity_onboarded', '1');
+  enterApp();
+}
+
+document.querySelectorAll('.ob-next-btn').forEach(btn => {
+  btn.addEventListener('click', () => showObStep(obStep + 1));
+});
+['obSkip', 'obSkip1', 'obSkip2'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', () => showObStep(3));
+});
+document.getElementById('obBankSearch').addEventListener('input', renderBankList);
+document.getElementById('obContinueBtn').addEventListener('click', () => {
+  if (obSelectedBanks.length > 0) finishOnboarding();
 });
 
 // ── Init ──
@@ -2123,104 +2409,21 @@ function userInitial() {
   return (currentUser?.name || '?').charAt(0).toUpperCase();
 }
 
-function showApp(isNew = false) {
+// Enter the main app UI (post-auth, post-onboarding).
+function enterApp() {
   document.getElementById('authOverlay').style.display = 'none';
-  document.getElementById('headerAvatar').textContent = userInitial();
-  document.getElementById('headerName').textContent = currentUser.name || '';
   updateMonthNav();
   updateCalMonthLabel();
-  loadOverview();
-  if (isNew) setTimeout(() => startTutorial(), 600);
+  switchTab('overview');
 }
 
-// ── Tutorial ──
-const TUTORIAL_STEPS = [
-  {
-    title: 'Welcome to Clarity!',
-    body: () => `Hey ${currentUser?.name?.split(' ')[0] || 'there'}! You're all set. Let's take a 60-second tour so you know where everything is.`,
-    tab: null,
-  },
-  {
-    title: 'Your Overview',
-    body: () => 'This is your home base. At a glance you can see your net for the month, savings rate, financial health score, spending breakdown, and upcoming bills.',
-    tab: 'overview',
-  },
-  {
-    title: 'Log Transactions',
-    body: () => 'Tap Transactions to log income and expenses. You can type them in manually or snap a photo of a check or receipt and let AI fill it in for you.',
-    tab: 'transactions',
-  },
-  {
-    title: 'Plan Your Money',
-    body: () => 'The Plan tab is your financial control center — set spending budgets, create savings goals, track subscriptions, manage debt, and monitor your net worth.',
-    tab: 'plan',
-  },
-  {
-    title: 'Track Paydays',
-    body: () => 'Set your pay schedule in the Calendar tab and Clarity will show you exactly how many days until your next payday, highlighted right on the calendar.',
-    tab: 'calendar',
-  },
-  {
-    title: 'Ask Clarity Anything',
-    body: () => 'The Chat tab connects you to an AI that knows your real financial data. Ask "Where am I overspending?" or "Am I on track for my goals?" and get honest answers.',
-    tab: 'chat',
-  },
-  {
-    title: "You're ready!",
-    body: () => 'Start by adding your first transaction — even one entry unlocks your spending chart and AI insights. Your financial picture gets clearer every day.',
-    tab: 'transactions',
-  },
-];
-
-let tutorialStep = 0;
-
-function startTutorial() {
-  tutorialStep = 0;
-  renderTutorialStep();
-  document.getElementById('tutorialOverlay').classList.add('open');
-}
-
-function renderTutorialStep() {
-  const step = TUTORIAL_STEPS[tutorialStep];
-  const total = TUTORIAL_STEPS.length;
-  const isLast = tutorialStep === total - 1;
-
-  document.getElementById('tutorialTitle').textContent = step.title;
-  document.getElementById('tutorialBody').textContent = step.body();
-  document.getElementById('tutorialNext').textContent = isLast ? 'Get started →' : 'Next →';
-
-  // Dots
-  document.getElementById('tutorialDots').innerHTML = TUTORIAL_STEPS.map((_, i) =>
-    `<div class="tutorial-dot ${i === tutorialStep ? 'active' : ''}"></div>`
-  ).join('');
-
-  // Switch to relevant tab if specified
-  if (step.tab) {
-    document.querySelectorAll('.tab').forEach(b => {
-      b.classList.toggle('active', b.dataset.tab === step.tab);
-    });
-    document.querySelectorAll('.tab-panel').forEach(p => {
-      p.classList.toggle('active', p.id === 'tab-' + step.tab);
-    });
-  }
-}
-
-function closeTutorial() {
-  document.getElementById('tutorialOverlay').classList.remove('open');
-  // Always land on overview when done
-  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'overview'));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-overview'));
-}
-
-document.getElementById('tutorialNext').addEventListener('click', () => {
-  if (tutorialStep < TUTORIAL_STEPS.length - 1) {
-    tutorialStep++;
-    renderTutorialStep();
+function showApp(isNew = false) {
+  document.getElementById('authOverlay').style.display = 'none';
+  if (isNew && localStorage.getItem('clarity_onboarded') !== '1') {
+    startOnboarding();
   } else {
-    closeTutorial();
+    enterApp();
   }
-});
-
-document.getElementById('tutorialSkip').addEventListener('click', closeTutorial);
+}
 
 initApp();
