@@ -235,235 +235,6 @@
       <div class="tile-list" id="recentTxList"></div>
     </div>
 
-    <!-- Account balances -->
-    <div class="accounts-card" id="accountsCard">
-      <div class="accounts-header">
-        <span class="accounts-title">Accounts</span>
-      </div>
-      <div class="accounts-tiles">
-        <div class="account-tile account-tile--checking">
-          <div class="account-tile-label">Checking</div>
-          <div class="account-tile-val" id="checkingDisplay">—</div>
-        </div>
-        <div class="account-tile account-tile--savings">
-          <div class="account-tile-label">Savings</div>
-          <div class="account-tile-val" id="savingsDisplay">—</div>
-        </div>
-      </div>
-      <div class="accounts-total-row">
-        <span class="accounts-total-label">Total balance</span>
-        <span class="accounts-total-val" id="accountsTotalDisplay">—</span>
-      </div>
-      <div class="accounts-inputs">
-        <div class="accounts-input-pair">
-          <div class="accounts-input-row">
-            <label class="account-input-label">Checking ($)</label>
-            <input class="form-input accounts-input" id="checkingInput" type="number" placeholder="0.00" min="0" step="0.01" />
-          </div>
-          <div class="accounts-input-row">
-            <label class="account-input-label">Savings ($)</label>
-            <input class="form-input accounts-input" id="savingsInput" type="number" placeholder="0.00" min="0" step="0.01" />
-          </div>
-        </div>
-        <button class="primary-btn" id="accountsSaveBtn">Update balances</button>
-      </div>
-    </div>
-
-    <!-- Health score -->
-    <div class="score-card" id="scoreCard">
-      <div class="score-left">
-        <div class="score-number" id="scoreNumber">—</div>
-        <div class="score-label">Financial health</div>
-      </div>
-      <div class="score-grade" id="scoreGrade">—</div>
-      <div class="score-bars" id="scoreBars"></div>
-    </div>
-
-    <!-- Summary card -->
-    <div class="summary-card">
-      <div class="summary-month-nav">
-        <button class="month-arrow" id="prevMonth">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <span class="month-label" id="monthLabel">May 2026</span>
-        <button class="month-arrow" id="nextMonth">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
-
-      <div class="summary-net" id="overviewNet">$0.00</div>
-      <div class="summary-net-sub">
-        <span class="summary-net-label">net this month</span>
-        <span class="overview-vs" id="overviewVs" style="display:none"></span>
-      </div>
-
-      <div class="summary-divider"></div>
-
-      <div class="summary-stats">
-        <div class="summary-stat">
-          <div class="summary-stat-val summary-stat-val--income" id="overviewIncome">$0</div>
-          <div class="summary-stat-key">income</div>
-        </div>
-        <div class="summary-stat-sep"></div>
-        <div class="summary-stat">
-          <div class="summary-stat-val summary-stat-val--expense" id="overviewExpenses">$0</div>
-          <div class="summary-stat-key">expenses</div>
-        </div>
-        <div class="summary-stat-sep"></div>
-        <div class="summary-stat">
-          <div class="summary-stat-val" id="overviewRate">—</div>
-          <div class="summary-stat-key">saved</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Savings card -->
-    <div class="ov-card savings-card" id="savingsCard">
-      <div class="savings-header">
-        <span class="ov-card-title" style="margin-bottom:0">Savings</span>
-        <span class="savings-streak-badge" id="savingsStreak" style="display:none"></span>
-      </div>
-      <div class="savings-stats-row">
-        <div class="savings-stat-block">
-          <div class="savings-amt" id="savingsAmt">—</div>
-          <div class="savings-stat-sub" id="savingsAmtLabel">saved this month</div>
-        </div>
-        <div class="savings-stat-block savings-stat-block--right">
-          <div class="savings-rate-pct" id="savingsRatePct">—</div>
-          <div class="savings-stat-sub">savings rate</div>
-        </div>
-      </div>
-      <div class="savings-bar-section">
-        <div class="savings-bar-track">
-          <div class="savings-bar-fill" id="savingsRateFill" style="width:0%"></div>
-          <div class="savings-bar-target"></div>
-        </div>
-        <div class="savings-bar-label">target 20%</div>
-      </div>
-      <div class="savings-footer">
-        <div class="savings-footer-item">
-          <div class="savings-footer-val" id="savingsAvg">—</div>
-          <div class="savings-footer-key">avg / month</div>
-        </div>
-        <div class="savings-footer-sep"></div>
-        <div class="savings-footer-item">
-          <div class="savings-footer-val" id="savingsProjected">—</div>
-          <div class="savings-footer-key">est. annual</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Budget alerts -->
-    <div id="alertsBlock"></div>
-
-    <!-- Insight strip -->
-    <div class="insight-strip">
-      <span class="insight-strip-badge">Clarity</span>
-      <span class="insight-strip-text" id="insightText">Analyzing your finances...</span>
-    </div>
-
-    <!-- Milestones badge strip (Feature 8) -->
-    <div id="milestonesStrip" style="display:none">
-      <div class="milestones-strip-inner" id="milestonesInner"></div>
-    </div>
-
-    <!-- Upcoming bills -->
-    <div class="ov-card" id="upcomingCard" style="display:none">
-      <div class="ov-card-title">Upcoming bills</div>
-      <div class="upcoming-list" id="upcomingList"></div>
-    </div>
-
-    <!-- Trends card -->
-    <div class="ov-card" id="trendsCard">
-      <div class="ov-card-title-row">
-        <span class="ov-card-title">6-month trend</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="trends-legend">
-            <span class="trends-legend-item trends-legend-income">Income</span>
-            <span class="trends-legend-item trends-legend-expense">Expenses</span>
-          </div>
-          <button class="forecast-set-btn" id="digestBtn">Weekly digest</button>
-        </div>
-      </div>
-      <div id="trendsChart"><div class="empty-state" style="padding:12px 0">No history yet.</div></div>
-      <div id="digestArea" style="display:none">
-        <div class="digest-content" id="digestContent"></div>
-      </div>
-    </div>
-
-    <!-- Financial Freedom card (Feature 3) -->
-    <div class="ov-card" id="freedomCard">
-      <div class="ov-card-title-row">
-        <span class="ov-card-title">Financial Freedom</span>
-        <button class="forecast-set-btn" id="freedomChangeBtn" style="display:none">Change target</button>
-      </div>
-      <div id="freedomSetArea">
-        <div class="freedom-empty-hint">Set your target annual spend to see your FI date.</div>
-        <div class="forecast-input-row" style="margin-top:10px">
-          <input class="form-input" id="freedomTargetInput" type="number" placeholder="Annual spend ($)" style="margin-bottom:0" />
-          <button class="primary-btn" id="freedomSaveBtn" style="width:auto;padding:10px 16px">Save</button>
-        </div>
-      </div>
-      <div id="freedomResult" style="display:none">
-        <div class="freedom-fi-row">
-          <div class="freedom-fi-num" id="freedomFiNum">—</div>
-          <div class="freedom-fi-label">FI number</div>
-        </div>
-        <div class="progress-bar" style="margin:10px 0 4px">
-          <div class="progress-fill" id="freedomProgressFill" style="width:0%"></div>
-        </div>
-        <div class="freedom-progress-labels">
-          <span id="freedomNetWorthLabel">Net worth: —</span>
-          <span id="freedomPctLabel">0%</span>
-        </div>
-        <div class="freedom-eta" id="freedomEta"></div>
-      </div>
-    </div>
-
-    <!-- Cash flow forecast -->
-    <div class="ov-card" id="forecastCard">
-      <div class="ov-card-title-row">
-        <span class="ov-card-title">Cash flow forecast</span>
-        <button class="forecast-set-btn" id="forecastSetBtn">Set balance</button>
-      </div>
-      <div id="forecastSetRow" style="display:none">
-        <div class="forecast-input-row">
-          <input class="form-input" id="forecastBalanceInput" type="number" placeholder="Current balance ($)" style="margin-bottom:8px" />
-          <button class="primary-btn" id="forecastSaveBtn" style="width:auto;padding:10px 16px">Save</button>
-        </div>
-      </div>
-      <div class="forecast-checkpoints" id="forecastCheckpoints">
-        <div class="empty-state" style="padding:12px 0">Set your current balance to see a forecast.</div>
-      </div>
-      <div class="forecast-events" id="forecastEvents"></div>
-    </div>
-
-    <!-- Spending card -->
-    <div class="ov-card">
-      <div class="ov-card-title">This month</div>
-      <div class="chart-block" id="chartBlock">
-        <div class="empty-state">No expenses logged yet.</div>
-      </div>
-    </div>
-
-    <!-- Budgets card -->
-    <div class="ov-card" id="budgetStatusCard" style="display:none">
-      <div class="ov-card-title">Budgets</div>
-      <div class="budget-status-list" id="budgetStatusList"></div>
-    </div>
-
-    <!-- Goals card -->
-    <div class="ov-card" id="goalsStatusCard" style="display:none">
-      <div class="ov-card-title">Goals</div>
-      <div class="goals-status-list" id="goalsStatusList"></div>
-    </div>
-
-    <!-- Emergency Fund card (Feature 1) -->
-    <div class="ov-card" id="emergencyCard">
-      <div class="ov-card-title">Emergency Fund</div>
-      <div id="emergencyContent"></div>
-    </div>
-
   </div>
 
   <!-- ── Activity (Transactions) tab ── -->
@@ -1087,6 +858,38 @@
         <label class="schedule-field-label">Target savings rate (%)</label>
         <input class="form-input" id="profileSavingsRate" type="number" placeholder="e.g. 20" min="0" max="100" />
         <button class="primary-btn" id="saveProfileBtn">Save profile</button>
+      </div>
+
+      <!-- Account balances -->
+      <div class="section-label">Balances</div>
+      <div class="accounts-card" id="accountsCard" style="margin-top:0;margin-bottom:20px">
+        <div class="accounts-tiles">
+          <div class="account-tile account-tile--checking">
+            <div class="account-tile-label">Checking</div>
+            <div class="account-tile-val" id="checkingDisplay">—</div>
+          </div>
+          <div class="account-tile account-tile--savings">
+            <div class="account-tile-label">Savings</div>
+            <div class="account-tile-val" id="savingsDisplay">—</div>
+          </div>
+        </div>
+        <div class="accounts-total-row">
+          <span class="accounts-total-label">Total balance</span>
+          <span class="accounts-total-val" id="accountsTotalDisplay">—</span>
+        </div>
+        <div class="accounts-inputs">
+          <div class="accounts-input-pair">
+            <div class="accounts-input-row">
+              <label class="account-input-label">Checking ($)</label>
+              <input class="form-input accounts-input" id="checkingInput" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="accounts-input-row">
+              <label class="account-input-label">Savings ($)</label>
+              <input class="form-input accounts-input" id="savingsInput" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+          <button class="primary-btn" id="accountsSaveBtn">Update balances</button>
+        </div>
       </div>
 
       <!-- Connected accounts (Plaid) -->

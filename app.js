@@ -69,12 +69,20 @@ function isCurrentMonth() {
   return viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
 }
 
-function updateMonthNav() {
-  document.getElementById('monthLabel').textContent = monthLabel(viewYear, viewMonth);
-  document.getElementById('nextMonth').disabled = isCurrentMonth();
+// Null-safe DOM event binding (several Home cards were removed).
+function bind(id, ev, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(ev, fn);
 }
 
-document.getElementById('prevMonth').addEventListener('click', () => {
+function updateMonthNav() {
+  const label = document.getElementById('monthLabel');
+  const next = document.getElementById('nextMonth');
+  if (label) label.textContent = monthLabel(viewYear, viewMonth);
+  if (next) next.disabled = isCurrentMonth();
+}
+
+bind('prevMonth', 'click', () => {
   if (viewMonth === 1) { viewMonth = 12; viewYear--; }
   else viewMonth--;
   updateMonthNav();
@@ -82,7 +90,7 @@ document.getElementById('prevMonth').addEventListener('click', () => {
   if (activeTab === 'transactions') loadTransactions();
 });
 
-document.getElementById('nextMonth').addEventListener('click', () => {
+bind('nextMonth', 'click', () => {
   if (isCurrentMonth()) return;
   if (viewMonth === 12) { viewMonth = 1; viewYear++; }
   else viewMonth++;
@@ -1079,13 +1087,13 @@ async function loadHealthScore() {
     </div>`;
 }
 
-// ── Cash flow forecast ──
-document.getElementById('forecastSetBtn').addEventListener('click', () => {
+// ── Cash flow forecast (card removed from Home; handlers kept null-safe) ──
+bind('forecastSetBtn', 'click', () => {
   const row = document.getElementById('forecastSetRow');
-  row.style.display = row.style.display === 'none' ? '' : 'none';
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
 });
 
-document.getElementById('forecastSaveBtn').addEventListener('click', async () => {
+bind('forecastSaveBtn', 'click', async () => {
   const balance = document.getElementById('forecastBalanceInput').value;
   if (!balance) return;
   await apiFetch('/api/forecast/balance', {
@@ -1829,7 +1837,7 @@ async function loadFreedom() {
   }
 }
 
-document.getElementById('freedomSaveBtn').addEventListener('click', async () => {
+bind('freedomSaveBtn', 'click', async () => {
   const val = document.getElementById('freedomTargetInput').value;
   if (!val) return;
   await apiFetch('/api/freedom/target', {
@@ -1840,15 +1848,15 @@ document.getElementById('freedomSaveBtn').addEventListener('click', async () => 
   loadFreedom();
 });
 
-document.getElementById('freedomChangeBtn').addEventListener('click', () => {
+bind('freedomChangeBtn', 'click', () => {
   document.getElementById('freedomSetArea').style.display = '';
   document.getElementById('freedomResult').style.display = 'none';
   document.getElementById('freedomChangeBtn').style.display = 'none';
 });
 
-// ── Feature 6: Weekly Digest ──
+// ── Feature 6: Weekly Digest (card removed from Home; handler null-safe) ──
 let digestLoaded = false;
-document.getElementById('digestBtn').addEventListener('click', async () => {
+bind('digestBtn', 'click', async () => {
   const area = document.getElementById('digestArea');
   const content = document.getElementById('digestContent');
   const btn = document.getElementById('digestBtn');
@@ -2207,7 +2215,7 @@ async function loadAccounts() {
   if (data.savingsBalance !== null) document.getElementById('savingsInput').value = data.savingsBalance;
 }
 
-document.getElementById('accountsSaveBtn').addEventListener('click', async () => {
+bind('accountsSaveBtn', 'click', async () => {
   const checking = document.getElementById('checkingInput').value;
   const savings = document.getElementById('savingsInput').value;
   await apiFetch('/api/accounts', {
@@ -2215,24 +2223,15 @@ document.getElementById('accountsSaveBtn').addEventListener('click', async () =>
     body: JSON.stringify({ checkingBalance: checking, savingsBalance: savings }),
   });
   loadAccounts();
+  loadHomeHero();
 });
 
-// ── Patch loadOverview to also fetch new data ──
-const _origLoadOverview = loadOverview;
+// Home now shows only greeting, balance, safe-to-spend, stat row, and
+// recent activity. The remaining analytics modules were removed; the
+// account-balance editor lives in Settings.
 loadOverview = async function () {
   loadGreeting();
-  loadAccounts();
   loadHomeHero();
-  await _origLoadOverview();
-  loadAlerts();
-  loadUpcoming();
-  loadTrends();
-  loadHealthScore();
-  loadForecast();
-  loadSavings();
-  loadEmergency();
-  loadFreedom();
-  loadMilestones();
   loadRecentTxs();
 };
 
@@ -2313,6 +2312,7 @@ function openSettingsScreen() {
   document.getElementById('profileBigAvatar').textContent = userInitial();
   document.getElementById('settingsProfileName').textContent = currentUser.name || '';
   document.getElementById('settingsProfileEmail').textContent = currentUser.email || '';
+  loadAccounts();
   // Client-only preference toggles.
   const alerts = localStorage.getItem('clarity_pref_alerts') !== '0';
   const biometric = localStorage.getItem('clarity_pref_biometric') === '1';
