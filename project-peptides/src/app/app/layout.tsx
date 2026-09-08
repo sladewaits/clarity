@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/data/service";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getCurrentUser();
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
       <Sidebar role={user.role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar user={{ name: user.name, title: user.title, role: user.role }} />
