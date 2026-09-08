@@ -6,7 +6,8 @@ import {
 
 const AXIS = { stroke: "hsl(var(--muted-foreground))", fontSize: 11 };
 const GRID = "hsl(var(--border))";
-const PRIMARY = "hsl(var(--primary))";
+// Clinical Teal is the chart highlight; Deep Petrol for solid marks.
+const PRIMARY = "hsl(var(--accent-strong))";
 
 function TooltipBox({ active, payload, label, fmt }: any) {
   if (!active || !payload?.length) return null;

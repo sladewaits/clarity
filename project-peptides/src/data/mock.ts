@@ -364,12 +364,13 @@ for (const cp of canonicalProducts) {
 }
 
 // --- Programs ----------------------------------------------------------------
+// Brand-consistent categorical palette (Deep Petrol / Clinical Teal anchored)
 const programSeed = [
-  { name: "Weight Management Program", category: "Metabolic", color: "#0E7C86", cats: ["Weight Management"] },
-  { name: "Hormone Optimization", category: "Hormone", color: "#5B6ABF", cats: ["Hormone"] },
+  { name: "Weight Management Program", category: "Metabolic", color: "#0F3B52", cats: ["Weight Management"] },
+  { name: "Hormone Optimization", category: "Hormone", color: "#2E6E8E", cats: ["Hormone"] },
   { name: "Recovery & Regenerative", category: "Recovery", color: "#C2683A", cats: ["Recovery","Peptides"] },
-  { name: "Longevity Program", category: "Longevity", color: "#2E7D5B", cats: ["Peptides","Wellness"] },
-  { name: "Sexual Wellness", category: "Wellness", color: "#8E4585", cats: ["Sexual Health"] },
+  { name: "Longevity Program", category: "Longevity", color: "#00C2B3", cats: ["Peptides","Wellness"] },
+  { name: "Sexual Wellness", category: "Wellness", color: "#7A5A86", cats: ["Sexual Health"] },
 ];
 export const programs: Program[] = [];
 for (const org of organizations) {

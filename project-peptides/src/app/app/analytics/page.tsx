@@ -9,7 +9,8 @@ import { formatCompactCurrency } from "@/lib/utils";
 
 export const metadata = { title: "Analytics" };
 
-const PALETTE = ["#0E7C86", "#5B6ABF", "#2E7D5B", "#C2683A", "#8E4585", "#3F7CAC", "#B08968", "#6D6875"];
+// Brand categorical palette — Deep Petrol / Clinical Teal anchored, restrained warmth
+const PALETTE = ["#0F3B52", "#00C2B3", "#2E6E8E", "#C2683A", "#4E8A6B", "#7A5A86", "#B0894F", "#5A6B72"];
 
 export default function AnalyticsPage() {
   const m = homeMetrics();

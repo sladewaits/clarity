@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, ShieldCheck } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/misc";
-import { Badge } from "@/components/ui/badge";
 
 export const metadata = { title: "Sign in" };
 
@@ -13,8 +12,8 @@ export default function LoginPage() {
       {/* form */}
       <div className="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-20">
         <div className="mx-auto w-full max-w-sm">
-          <Link href="/"><Logo /></Link>
-          <h1 className="mt-10 text-2xl font-semibold tracking-tight">Sign in to your clinic</h1>
+          <Link href="/" className="inline-flex"><BrandLogo variant="horizontal" tone="dark-on-light" size={34} /></Link>
+          <h1 className="mt-10 text-2xl font-semibold tracking-tight text-primary">Sign in to your clinic</h1>
           <p className="mt-1 text-sm text-muted-foreground">Welcome back. Access your program operating system.</p>
 
           <div className="mt-8 space-y-4">
@@ -37,21 +36,20 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* brand panel */}
-      <div className="relative hidden overflow-hidden bg-foreground text-background lg:block">
-        <div className="grain absolute inset-0 opacity-40" />
+      {/* brand panel — Deep Petrol */}
+      <div className="relative hidden overflow-hidden bg-primary text-primary-foreground lg:block">
+        <div className="grain absolute inset-0 opacity-30" />
         <div className="relative flex h-full flex-col justify-between p-16">
-          <div />
+          <BrandLogo variant="horizontal" tone="white-on-petrol" size={32} />
           <div>
-            <Badge className="bg-background/15 text-background">APEX LONGEVITY · Jacksonville, FL</Badge>
-            <p className="mt-6 text-3xl font-semibold leading-tight tracking-tight text-balance">
-              “Project Peptides runs our program.”
+            <p className="font-serif text-4xl leading-[1.15] tracking-tight text-balance">
+              The operating system for modern specialty care.
             </p>
-            <p className="mt-4 max-w-md text-background/70">
-              One platform for pharmacy connectivity, program operations, education, patient fulfillment, and growth.
+            <p className="mt-5 max-w-md text-lg text-primary-foreground/75">
+              Independent practices. A stronger tomorrow.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-background/60">
+          <div className="flex items-center gap-2 text-sm text-primary-foreground/60">
             <ShieldCheck className="size-4" /> Built for HIPAA-readiness · RBAC · audit logging architecture
           </div>
         </div>

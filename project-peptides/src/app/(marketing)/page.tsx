@@ -28,12 +28,12 @@ export default function MarketingHome() {
         <Section className="relative py-20 sm:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
-              <Badge variant="outline" className="gap-1.5"><span className="size-1.5 rounded-full bg-primary" /> For modern cash-pay practices</Badge>
-              <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-6xl text-balance">
-                The operating system for modern longevity medicine.
+              <Badge variant="outline" className="gap-1.5"><span className="size-1.5 rounded-full bg-accent-strong" /> For modern cash-pay practices</Badge>
+              <h1 className="mt-5 font-serif text-4xl font-semibold leading-[1.06] tracking-tight text-primary sm:text-6xl text-balance">
+                The operating system for modern specialty care.
               </h1>
               <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-                One platform for pharmacy connectivity, program operations, education, patient fulfillment, and growth.
+                Independent practices. A stronger tomorrow. One platform for pharmacy connectivity, program operations, education, patient fulfillment, and growth.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/book-demo"><Button size="lg">Book a Demo <ArrowRight className="size-4" /></Button></Link>

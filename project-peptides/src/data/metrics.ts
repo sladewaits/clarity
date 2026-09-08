@@ -94,7 +94,7 @@ export function pharmacyUsage(orgId = CURRENT_ORG_ID) {
     .map((ph) => ({
       name: ph.name.split(" ")[0],
       value: orders.filter((o) => o.pharmacyId === ph.id).length,
-      color: ph.type === "503A" ? "#0E7C86" : "#5B6ABF",
+      color: ph.type === "503A" ? "#0F3B52" : "#00C2B3",
     }))
     .filter((p) => p.value > 0)
     .sort((a, b) => b.value - a.value);

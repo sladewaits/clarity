@@ -4,81 +4,122 @@
 
 @layer base {
   :root {
-    /* Warm off-white ground, graphite ink, clinical teal accent */
-    --background: 40 30% 98%;        /* #FAF9F6 warm off-white */
-    --foreground: 220 26% 14%;       /* graphite / near-black */
+    /* --------------------------------------------------------------------
+       Project Peptides brand palette (exact source-of-truth hex values).
+       Kept as reference tokens; semantic HSL tokens below are tuned to match.
+       Deep Petrol #0F3B52 · Clinical Teal #00C2B3 · Pale Aqua #E6F7F5
+       Mineral White #FBF6F2 · Graphite #1F2A2E · Surface White #FFFFFF
+       -------------------------------------------------------------------- */
+    --brand-petrol: #0F3B52;
+    --brand-teal: #00C2B3;
+    --brand-aqua: #E6F7F5;
+    --brand-mineral: #FBF6F2;
+    --brand-graphite: #1F2A2E;
+    --brand-white: #FFFFFF;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 26% 14%;
+    /* Semantic tokens (HSL channels, consumed via hsl(var(--token))) */
+    --background: 27 53% 97%;        /* Mineral White — app canvas */
+    --foreground: 196 19% 15%;       /* Graphite — body text */
+
+    --card: 0 0% 100%;               /* Surface White — cards/forms/tables */
+    --card-foreground: 196 19% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 26% 14%;
+    --popover-foreground: 196 19% 15%;
 
-    --primary: 187 62% 30%;          /* clinical teal */
-    --primary-foreground: 40 30% 98%;
+    --primary: 201 69% 19%;          /* Deep Petrol — primary actions, brand */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 20% 94%;
-    --secondary-foreground: 220 26% 20%;
+    --secondary: 30 22% 95%;         /* warm neutral surface */
+    --secondary-foreground: 201 45% 22%;
 
-    --muted: 40 16% 95%;
-    --muted-foreground: 220 12% 46%;
+    --muted: 30 20% 95%;
+    --muted-foreground: 200 8% 42%;
 
-    --accent: 187 45% 92%;
-    --accent-foreground: 187 62% 24%;
+    --accent: 173 52% 94%;           /* Pale Aqua — selected / soft highlight */
+    --accent-foreground: 201 69% 19%;/* Deep Petrol text on aqua (accessible) */
 
-    --destructive: 0 65% 48%;
+    /* Clinical Teal — selective accent, focus, chart highlight.
+       Text/controls ON teal use petrol, never white (contrast). */
+    --accent-strong: 175 100% 38%;
+    --accent-strong-foreground: 201 69% 24%;
+
+    --destructive: 0 64% 43%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 158 58% 34%;
+    --success: 165 64% 26%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 33 90% 46%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 35 92% 44%;
+    --warning-foreground: 196 22% 14%;/* dark text on amber (contrast) */
+    --warning-ink: 30 96% 25%;       /* accessible amber text on light tint */
 
-    --border: 40 14% 89%;
-    --input: 40 14% 89%;
-    --ring: 187 62% 30%;
+    --border: 30 16% 88%;
+    --input: 30 16% 86%;
+    --ring: 175 100% 38%;            /* Clinical Teal — focus ring */
 
-    --radius: 0.7rem;
+    --radius: 0.625rem;
 
-    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-serif: var(--font-source-serif), ui-serif, Georgia, "Times New Roman", serif;
     --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+
+    /* Sidebar — Deep Petrol brand surface with light content */
+    --sidebar: 201 69% 19%;
+    --sidebar-foreground: 180 33% 93%;
+    --sidebar-muted: 193 26% 72%;
+    --sidebar-accent: 200 52% 27%;   /* active item background */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 200 42% 28%;
+    --sidebar-ring: 175 100% 45%;
   }
 
   .dark {
-    --background: 220 27% 8%;
-    --foreground: 40 20% 94%;
+    --background: 196 26% 9%;
+    --foreground: 40 30% 95%;
 
-    --card: 220 24% 11%;
-    --card-foreground: 40 20% 94%;
+    --card: 197 22% 12%;
+    --card-foreground: 40 30% 95%;
 
-    --popover: 220 24% 11%;
-    --popover-foreground: 40 20% 94%;
+    --popover: 197 22% 12%;
+    --popover-foreground: 40 30% 95%;
 
-    --primary: 185 55% 45%;
-    --primary-foreground: 220 27% 8%;
+    --primary: 190 52% 46%;
+    --primary-foreground: 196 40% 10%;
 
-    --secondary: 220 18% 18%;
-    --secondary-foreground: 40 20% 92%;
+    --secondary: 197 18% 18%;
+    --secondary-foreground: 40 24% 92%;
 
-    --muted: 220 18% 16%;
-    --muted-foreground: 220 10% 62%;
+    --muted: 197 16% 16%;
+    --muted-foreground: 195 12% 64%;
 
-    --accent: 187 40% 20%;
-    --accent-foreground: 185 60% 78%;
+    --accent: 197 30% 20%;
+    --accent-foreground: 173 58% 80%;
+
+    --accent-strong: 175 85% 42%;
+    --accent-strong-foreground: 196 40% 10%;
 
     --destructive: 0 62% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 158 52% 44%;
-    --success-foreground: 220 27% 8%;
+    --success: 165 54% 42%;
+    --success-foreground: 196 40% 10%;
 
-    --warning: 33 85% 55%;
-    --warning-foreground: 220 27% 8%;
+    --warning: 35 85% 55%;
+    --warning-foreground: 196 40% 10%;
+    --warning-ink: 38 90% 66%;
 
-    --border: 220 16% 20%;
-    --input: 220 16% 22%;
-    --ring: 185 55% 45%;
+    --border: 197 16% 22%;
+    --input: 197 16% 24%;
+    --ring: 175 85% 46%;
+
+    --sidebar: 197 30% 11%;
+    --sidebar-foreground: 180 24% 88%;
+    --sidebar-muted: 195 12% 60%;
+    --sidebar-accent: 197 26% 20%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 197 18% 22%;
+    --sidebar-ring: 175 85% 46%;
   }
 
   * {
@@ -86,18 +127,20 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   ::selection {
-    background: hsl(var(--primary) / 0.16);
+    background: hsl(var(--accent-strong) / 0.22);
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .font-serif {
+    font-family: var(--font-serif);
   }
   .grain {
     background-image: radial-gradient(hsl(var(--foreground) / 0.015) 1px, transparent 1px);

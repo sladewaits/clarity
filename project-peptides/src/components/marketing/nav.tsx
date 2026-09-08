@@ -57,7 +57,7 @@ export function MarketingFooter() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
         <div className="md:col-span-1">
           <Logo />
-          <p className="mt-4 max-w-xs text-sm text-muted-foreground">The operating system for modern longevity medicine.</p>
+          <p className="mt-4 max-w-xs text-sm text-muted-foreground">The operating system for modern specialty care.</p>
         </div>
         <FooterCol title="Platform" links={[["Overview","/platform"],["Pharmacy Network","/pharmacy-network"],["Programs","/programs-overview"],["Education","/education-overview"]]} />
         <FooterCol title="Company" links={[["For Clinics","/for-clinics"],["Security","/security"],["About","/about"],["Book a Demo","/book-demo"]]} />

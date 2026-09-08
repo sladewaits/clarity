@@ -5,12 +5,12 @@ import { PageHero, Section, SectionHeading, CTASection } from "@/components/mark
 export const metadata = { title: "Programs" };
 
 const PROGRAMS = [
-  { name: "Weight Management", color: "#0E7C86", body: "Structured metabolic programs with approved products, required labs, and a defined follow-up cadence." },
-  { name: "Hormone Optimization", color: "#5B6ABF", body: "Provider-supervised hormone programs with eligibility-aware ordering and licensure enforcement." },
+  { name: "Weight Management", color: "#0F3B52", body: "Structured metabolic programs with approved products, required labs, and a defined follow-up cadence." },
+  { name: "Hormone Optimization", color: "#2E6E8E", body: "Provider-supervised hormone programs with eligibility-aware ordering and licensure enforcement." },
   { name: "Recovery & Regenerative", color: "#C2683A", body: "Peptide and recovery protocols organized into repeatable, trackable programs." },
-  { name: "Longevity", color: "#2E7D5B", body: "Longitudinal longevity programs with education, KPIs, and retention analytics." },
-  { name: "Sexual Wellness", color: "#8E4585", body: "Discreet, compliant programs with patient education and consistent fulfillment." },
-  { name: "Custom", color: "#3F7CAC", body: "Build your own program with the products, providers, labs, and forms you choose." },
+  { name: "Longevity", color: "#00C2B3", body: "Longitudinal longevity programs with education, KPIs, and retention analytics." },
+  { name: "Sexual Wellness", color: "#7A5A86", body: "Discreet, compliant programs with patient education and consistent fulfillment." },
+  { name: "Custom", color: "#4E8A6B", body: "Build your own program with the products, providers, labs, and forms you choose." },
 ];
 
 export default function ProgramsOverviewPage() {
