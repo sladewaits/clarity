@@ -29,7 +29,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
-        title={`Good afternoon, ${user.name.split(" ")[1] ?? user.name}`}
+        title={`Good afternoon, ${user.name.split(" ")[0]}`}
         description={`${org.name} · Command center across ${org.locationIds.length} locations`}
         actions={
           <>
