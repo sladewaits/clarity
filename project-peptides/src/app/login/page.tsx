@@ -42,10 +42,10 @@ export default function LoginPage() {
         <div className="relative flex h-full flex-col justify-between p-16">
           <BrandLogo variant="horizontal" tone="white-on-petrol" size={32} />
           <div>
-            <p className="font-serif text-4xl leading-[1.15] tracking-tight text-balance">
+            <p className="text-4xl font-semibold leading-[1.12] tracking-tight text-balance">
               The operating system for modern specialty care.
             </p>
-            <p className="mt-5 max-w-md text-lg text-primary-foreground/75">
+            <p className="mt-5 max-w-md font-serif text-2xl text-primary-foreground/85">
               Independent practices. A stronger tomorrow.
             </p>
           </div>

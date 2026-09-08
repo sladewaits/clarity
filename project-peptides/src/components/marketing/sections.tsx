@@ -14,7 +14,7 @@ export function SectionHeading({ eyebrow, title, subtitle, center }: { eyebrow?:
   return (
     <div className={cn("max-w-2xl", center && "mx-auto text-center")}>
       {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-      <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-primary sm:text-4xl text-balance">{title}</h2>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-primary sm:text-[2.5rem] sm:leading-[1.1] text-balance">{title}</h2>
       {subtitle && <p className="mt-4 text-lg text-muted-foreground">{subtitle}</p>}
     </div>
   );
@@ -26,7 +26,7 @@ export function PageHero({ eyebrow, title, subtitle, cta }: { eyebrow: string; t
       <div className="grain absolute inset-0 opacity-60" />
       <Section className="relative py-20 sm:py-28">
         <Eyebrow>{eyebrow}</Eyebrow>
-        <h1 className="mt-4 max-w-3xl font-serif text-4xl font-semibold tracking-tight text-primary sm:text-5xl text-balance">{title}</h1>
+        <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-primary sm:text-5xl text-balance">{title}</h1>
         <p className="mt-5 max-w-2xl text-lg text-muted-foreground">{subtitle}</p>
         {cta && <div className="mt-8 flex flex-wrap gap-3">{cta}</div>}
       </Section>
@@ -64,7 +64,7 @@ export function CTASection() {
         <div className="grain absolute inset-0 opacity-20" />
         <div className="relative">
           <Badge className="border border-white/20 bg-white/10 text-primary-foreground">Book a Demo</Badge>
-          <h2 className="mx-auto mt-5 max-w-2xl font-serif text-3xl font-semibold tracking-tight sm:text-4xl text-balance">
+          <h2 className="mx-auto mt-5 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl text-balance">
             See how Project Peptides runs your entire program.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-primary-foreground/75">
@@ -72,7 +72,7 @@ export function CTASection() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/book-demo" className="rounded-lg bg-accent-strong px-6 py-3 text-sm font-semibold text-accent-strong-foreground transition-transform hover:scale-[1.02]">Book a Demo</Link>
-            <Link href="/app" className="rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-white/10">Explore the Platform</Link>
+            <Link href="/app" className="rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-white/10">Explore the demo</Link>
           </div>
         </div>
       </div>

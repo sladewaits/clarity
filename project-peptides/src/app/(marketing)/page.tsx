@@ -1,11 +1,11 @@
 import Link from "next/link";
 import {
   ArrowRight, Building2, GraduationCap, LayoutGrid, BarChart3, MapPin,
-  LifeBuoy, Boxes, Workflow, ShieldCheck, Stethoscope, Pill,
+  LifeBuoy, Boxes, Stethoscope,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Section, SectionHeading, FeatureCard, StatStrip, CTASection, Eyebrow } from "@/components/marketing/sections";
+import { Section, SectionHeading, StatStrip, CTASection, Eyebrow } from "@/components/marketing/sections";
 import { Reveal } from "@/components/marketing/reveal";
 
 const MODULES = [
@@ -26,54 +26,40 @@ export default function MarketingHome() {
       <div className="relative overflow-hidden border-b border-border">
         <div className="grain absolute inset-0 opacity-60" />
         <Section className="relative py-20 sm:py-28">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
+          <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr]">
             <div>
-              <Badge variant="outline" className="gap-1.5"><span className="size-1.5 rounded-full bg-accent-strong" /> For modern cash-pay practices</Badge>
-              <h1 className="mt-5 font-serif text-4xl font-semibold leading-[1.06] tracking-tight text-primary sm:text-6xl text-balance">
-                The operating system for modern specialty care.
+              <Badge variant="outline" className="gap-1.5"><span className="size-1.5 rounded-full bg-accent-strong" /> For modern specialty practices</Badge>
+              <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-primary sm:text-[3.5rem] sm:leading-[1.03]">
+                The operating system<br className="hidden sm:block" /> for modern specialty care.
               </h1>
-              <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-                Independent practices. A stronger tomorrow. One platform for pharmacy connectivity, program operations, education, patient fulfillment, and growth.
+              <p className="mt-5 font-serif text-xl text-foreground/80">Independent practices. A stronger tomorrow.</p>
+              <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
+                Connect your pharmacy workflows, equip your team, and manage specialty programs with greater clarity.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/book-demo"><Button size="lg">Book a Demo <ArrowRight className="size-4" /></Button></Link>
-                <Link href="/app"><Button size="lg" variant="outline">Explore the Platform</Button></Link>
+                <Link href="/app"><Button size="lg" variant="outline">Explore the demo</Button></Link>
               </div>
-              <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
-                <ShieldCheck className="size-4 text-primary" /> RBAC · audit logging · HIPAA-readiness architecture
-              </p>
             </div>
 
-            {/* Dashboard preview mock */}
+            {/* Real product screenshot from the app (demo data) */}
             <div className="relative">
-              <div className="rounded-2xl border border-border bg-card p-3 shadow-lift">
-                <div className="rounded-xl bg-background p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2"><Pill className="size-4 text-primary" /><span className="text-sm font-semibold">APEX LONGEVITY</span></div>
-                    <Badge variant="warning">Demo</Badge>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-3">
-                    {[["Active patients","142"],["Orders / mo","38"],["Revenue","$182K"]].map(([l, v]) => (
-                      <div key={l} className="rounded-lg border border-border bg-card p-3">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{l}</p>
-                        <p className="mt-1 text-lg font-semibold tabular-nums">{v}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex h-24 items-end gap-1.5 rounded-lg border border-border bg-card p-3">
-                    {[40, 55, 48, 70, 62, 80, 72, 90, 84, 96].map((h, i) => (
-                      <div key={i} className="flex-1 rounded-t bg-primary/70" style={{ height: `${h}%` }} />
-                    ))}
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {[["Sermorelin 5mg","Meridian · 503A","Delivered"],["Semaglutide 5mg","Cypress · 503A","Shipped"]].map(([a, b, c]) => (
-                      <div key={a} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
-                        <div><p className="text-xs font-medium">{a}</p><p className="text-[10px] text-muted-foreground">{b}</p></div>
-                        <Badge variant={c === "Delivered" ? "success" : "secondary"} className="text-[10px]">{c}</Badge>
-                      </div>
-                    ))}
-                  </div>
+              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lift">
+                <div className="flex items-center gap-1.5 border-b border-border bg-muted/50 px-3.5 py-2.5">
+                  <span className="size-2.5 rounded-full bg-border" />
+                  <span className="size-2.5 rounded-full bg-border" />
+                  <span className="size-2.5 rounded-full bg-border" />
+                  <span className="ml-2 truncate text-xs text-muted-foreground">Project Peptides · Clinic dashboard</span>
+                  <Badge variant="warning" className="ml-auto shrink-0">Demo data</Badge>
                 </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/hero/dashboard.png"
+                  alt="Project Peptides clinic dashboard: program KPIs, an orders-and-fulfillment trend, and the operational task feed. Demo data."
+                  width={1440}
+                  height={980}
+                  className="block w-full"
+                />
               </div>
             </div>
           </div>
@@ -127,13 +113,17 @@ export default function MarketingHome() {
         </Section>
       </div>
 
-      {/* Modules */}
+      {/* Capabilities — lighter feature grid (not boxed cards) */}
       <Section className="py-20">
-        <SectionHeading eyebrow="One platform, ten capabilities" title="The pharmacy marketplace is one module inside a larger clinic operating system." />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <SectionHeading eyebrow="One platform, eight capabilities" title="The pharmacy marketplace is one module inside a larger clinic operating system." />
+        <div className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
           {MODULES.map((m, i) => (
-            <Reveal key={m.title} delay={(i % 4) * 0.06}>
-              <FeatureCard icon={m.icon} title={m.title}>{m.body}</FeatureCard>
+            <Reveal key={m.title} delay={(i % 4) * 0.05}>
+              <div className="flex flex-col">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">{m.icon}</div>
+                <h3 className="mt-4 text-[15px] font-semibold text-foreground">{m.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{m.body}</p>
+              </div>
             </Reveal>
           ))}
         </div>

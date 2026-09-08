@@ -43,16 +43,30 @@ export default function HomePage() {
         }
       />
 
-      {/* KPI grid */}
+      {/* Primary metrics */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Active Patients" value={String(m.activePatients)} delta="+6%" hint="vs last month" />
-        <StatCard label="Orders This Month" value={String(m.ordersThisMonth)} delta="+12%" />
-        <StatCard label="Pending Prescriptions" value={String(m.pendingPrescriptions)} delta="Needs review" deltaTone="neutral" />
-        <StatCard label="In Fulfillment" value={String(m.inFulfillment)} delta="Live" deltaTone="neutral" />
-        <StatCard label="Delivered Orders" value={String(m.delivered)} delta="+9%" />
-        <StatCard label="Est. Monthly Program Revenue" value={formatCompactCurrency(m.monthlyRevenueCents)} delta="+14%" />
-        <StatCard label="Avg. Fulfillment Time" value={`${m.avgFulfillDays} days`} delta="-0.3d" deltaTone="positive" />
-        <StatCard label="Patient Retention" value={`${m.retentionPct}%`} delta="+2%" />
+        <StatCard label="Orders This Month" value={String(m.ordersThisMonth)} delta="+12%" hint="vs last month" />
+        <StatCard label="Est. Monthly Program Revenue" value={formatCompactCurrency(m.monthlyRevenueCents)} delta="+14%" hint="recognized + in-flight" />
+        <StatCard label="Patient Retention" value={`${m.retentionPct}%`} delta="+2%" hint="trailing 90 days" />
+      </div>
+
+      {/* Secondary summary — quieter operational metrics */}
+      <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-subtle sm:grid-cols-4">
+        {[
+          { label: "Pending Prescriptions", value: String(m.pendingPrescriptions), note: "Needs review" },
+          { label: "In Fulfillment", value: String(m.inFulfillment), note: "Live" },
+          { label: "Delivered Orders", value: String(m.delivered), note: "+9%" },
+          { label: "Avg. Fulfillment Time", value: `${m.avgFulfillDays} days`, note: "−0.3d" },
+        ].map((s) => (
+          <div key={s.label} className="bg-card px-5 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.label}</p>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="text-xl font-semibold tabular-nums text-foreground">{s.value}</span>
+              <span className="text-xs text-muted-foreground">{s.note}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">

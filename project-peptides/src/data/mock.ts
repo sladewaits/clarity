@@ -502,28 +502,29 @@ for (let i = 0; i < 108; i++) {
 orders.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
 // --- Education ---------------------------------------------------------------
-const eduSeed: [title: string, category: string, min: number, audience: EducationModule["audience"]][] = [
-  ["Peptide Therapy Foundations", "Clinical Education", 45, ["provider"]],
-  ["GLP-1 Program Clinical Overview", "Clinical Education", 60, ["provider"]],
-  ["Hormone Optimization Essentials", "Clinical Education", 55, ["provider"]],
-  ["Injectable Handling & Cold-Chain", "Medication Education", 30, ["staff","provider"]],
-  ["Reconstitution & Dosing Basics", "Medication Education", 35, ["staff","provider"]],
-  ["503A vs 503B: What Staff Need to Know", "Compliance", 25, ["staff","provider"]],
-  ["Patient Onboarding Playbook", "Staff Training", 40, ["staff"]],
-  ["Front Desk: Order Status Communication", "Staff Training", 20, ["staff"]],
-  ["HIPAA & Minimum Necessary Access", "Compliance", 30, ["staff","provider"]],
-  ["Program Launch Checklist", "Program Launch", 50, ["staff","provider"]],
-  ["Talking to Patients About Weight Management", "Patient Communication", 25, ["staff","provider"]],
-  ["Adverse Event Reporting Workflow", "Compliance", 20, ["provider","staff"]],
-  ["Longevity Program Operations", "Operations", 45, ["staff","provider"]],
-  ["Pharmacy Selection & Fulfillment", "Operations", 30, ["staff","provider"]],
-  ["Patient Education: Self-Injection Basics", "Patient Communication", 15, ["patient"]],
+const eduSeed: [title: string, category: string, min: number, audience: EducationModule["audience"], description: string][] = [
+  ["Peptide Therapy Foundations", "Clinical Education", 45, ["provider"], "Core concepts behind peptide therapies, common classes, and how programs are structured."],
+  ["GLP-1 Program Clinical Overview", "Clinical Education", 60, ["provider"], "How GLP-1 weight-management programs are organized, from intake through follow-up — including semaglutide and tirzepatide."],
+  ["Hormone Optimization Essentials", "Clinical Education", 55, ["provider"], "An orientation to hormone optimization programs, required labs, and monitoring cadence."],
+  ["Injectable Handling & Cold-Chain", "Medication Education", 30, ["staff","provider"], "Receiving, storing, and handling injectable therapies while keeping cold-chain integrity."],
+  ["Reconstitution & Dosing Basics", "Medication Education", 35, ["staff","provider"], "General principles for reconstitution and dose preparation in a clinic setting."],
+  ["503A vs 503B: What Staff Need to Know", "Compliance", 25, ["staff","provider"], "The practical difference between patient-specific (503A) and clinic-supply (503B) pathways."],
+  ["Patient Onboarding Playbook", "Staff Training", 40, ["staff"], "A step-by-step playbook for onboarding new program patients."],
+  ["Front Desk: Order Status Communication", "Staff Training", 20, ["staff"], "How to read order status and communicate clear updates to patients."],
+  ["HIPAA & Minimum Necessary Access", "Compliance", 30, ["staff","provider"], "Handling protected health information under the minimum-necessary principle."],
+  ["Program Launch Checklist", "Program Launch", 50, ["staff","provider"], "Everything a location needs to stand up a new specialty program."],
+  ["Talking to Patients About Weight Management", "Patient Communication", 25, ["staff","provider"], "Consistent, compassionate language for weight-management conversations."],
+  ["Adverse Event Reporting Workflow", "Compliance", 20, ["provider","staff"], "How to recognize, document, and escalate an adverse event."],
+  ["Longevity Program Operations", "Operations", 45, ["staff","provider"], "Running longitudinal longevity programs day to day."],
+  ["Pharmacy Selection & Fulfillment", "Operations", 30, ["staff","provider"], "Choosing a pharmacy and tracking an order through fulfillment."],
+  ["Patient Education: Self-Injection Basics", "Patient Communication", 15, ["patient"], "A patient-facing walkthrough of safe self-injection technique."],
 ];
 export const educationModules: EducationModule[] = eduSeed.map((e, i) => ({
   id: `edu_${i + 1}`, title: e[0], category: e[1], durationMin: e[2],
-  description: `${e[0]} — approved training content. Placeholder body; clinical content requires medical review and approval before publication.`,
+  description: e[4],
   version: `v${int(1, 3)}.${int(0, 9)}`, lastReviewedAt: daysAgo(int(10, 180)),
-  reviewer: pick(["Clinical Advisory Board","Dr. Morgan Ellis, MD","PP Compliance"]), audience: e[3],
+  // Demo content: no real reviewer, approval, or accreditation is asserted.
+  reviewer: "Demo — clinical review pending", audience: e[3],
 }));
 
 export const educationCompletions: EducationCompletion[] = [];
@@ -585,7 +586,7 @@ for (const org of organizations) {
 
 // --- Alerts & activity (demo org) -------------------------------------------
 export const alerts: Alert[] = [
-  { id: "al1", severity: "warning", title: "2 staff certifications expire soon", detail: "HIPAA & Minimum Necessary Access certificates lapse within 14 days.", at: daysAgo(0) },
+  { id: "al1", severity: "warning", title: "2 staff training renewals due", detail: "HIPAA & Minimum Necessary Access renewals are due within 14 days.", at: daysAgo(0) },
   { id: "al2", severity: "info", title: "Pharmacy pricing updated", detail: "Meridian Compounding refreshed pricing on 6 SKUs.", at: daysAgo(1) },
   { id: "al3", severity: "critical", title: "1 order exception", detail: "RX-10420 requires address verification before shipment.", at: daysAgo(0) },
   { id: "al4", severity: "info", title: "New education module available", detail: "‘GLP-1 Program Clinical Overview’ was published to your library.", at: daysAgo(2) },
@@ -595,7 +596,7 @@ export const activity: ActivityItem[] = [
   { id: "ac2", icon: "truck", title: "3 orders shipped today", detail: "Meridian Compounding · Cypress Pharmacy", at: daysAgo(0) },
   { id: "ac3", icon: "tag", title: "Pharmacy pricing updated", detail: "Meridian Compounding · 6 SKUs", at: daysAgo(1) },
   { id: "ac4", icon: "book", title: "New education module available", detail: "GLP-1 Program Clinical Overview", at: daysAgo(2) },
-  { id: "ac5", icon: "award", title: "2 staff certifications expire soon", detail: "Renew before they lapse", at: daysAgo(2) },
+  { id: "ac5", icon: "award", title: "2 staff training renewals due", detail: "Renew before they lapse", at: daysAgo(2) },
   { id: "ac6", icon: "user", title: "5 new patients onboarded", detail: "This week", at: daysAgo(3) },
 ];
 
