@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm off-white ground, graphite ink, clinical teal accent */
+    --background: 40 30% 98%;        /* #FAF9F6 warm off-white */
+    --foreground: 220 26% 14%;       /* graphite / near-black */
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 26% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 26% 14%;
+
+    --primary: 187 62% 30%;          /* clinical teal */
+    --primary-foreground: 40 30% 98%;
+
+    --secondary: 40 20% 94%;
+    --secondary-foreground: 220 26% 20%;
+
+    --muted: 40 16% 95%;
+    --muted-foreground: 220 12% 46%;
+
+    --accent: 187 45% 92%;
+    --accent-foreground: 187 62% 24%;
+
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 58% 34%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 33 90% 46%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 40 14% 89%;
+    --input: 40 14% 89%;
+    --ring: 187 62% 30%;
+
+    --radius: 0.7rem;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  }
+
+  .dark {
+    --background: 220 27% 8%;
+    --foreground: 40 20% 94%;
+
+    --card: 220 24% 11%;
+    --card-foreground: 40 20% 94%;
+
+    --popover: 220 24% 11%;
+    --popover-foreground: 40 20% 94%;
+
+    --primary: 185 55% 45%;
+    --primary-foreground: 220 27% 8%;
+
+    --secondary: 220 18% 18%;
+    --secondary-foreground: 40 20% 92%;
+
+    --muted: 220 18% 16%;
+    --muted-foreground: 220 10% 62%;
+
+    --accent: 187 40% 20%;
+    --accent-foreground: 185 60% 78%;
+
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 52% 44%;
+    --success-foreground: 220 27% 8%;
+
+    --warning: 33 85% 55%;
+    --warning-foreground: 220 27% 8%;
+
+    --border: 220 16% 20%;
+    --input: 220 16% 22%;
+    --ring: 185 55% 45%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.16);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .grain {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.015) 1px, transparent 1px);
+    background-size: 3px 3px;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
