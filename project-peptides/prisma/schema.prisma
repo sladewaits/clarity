@@ -1,0 +1,658 @@
+// Project Peptides — canonical relational data model.
+//
+// This is the production target schema. The demo runs against an in-memory
+// mock provider (src/data/mock.ts) exposed through the service layer
+// (src/data/service.ts). To go live, point the service layer at this schema
+// via Prisma Client — the UI is untouched because it only depends on the
+// service-layer types (src/lib/types.ts).
+//
+// Conventions: UUID primary keys, snake_case tables, explicit indexes on
+// foreign keys and common filters. PHI-bearing tables are annotated.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Organizations, locations, users, RBAC
+// ----------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  plan      Plan     @default(founding)
+  createdAt DateTime @default(now())
+
+  locations     Location[]
+  users         User[]
+  patients      Patient[]
+  programs      Program[]
+  orders        Order[]
+  supportTickets SupportTicket[]
+  subscription  Subscription?
+  invoices      Invoice[]
+  auditLogs     AuditLog[]
+}
+
+model Location {
+  id          String  @id @default(uuid())
+  orgId       String
+  name        String
+  city        String
+  state       String  @db.Char(2)
+  addressLine String
+  phone       String
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  patients     Patient[]
+  orders       Order[]
+
+  @@index([orgId])
+  @@index([state])
+}
+
+model User {
+  id               String    @id @default(uuid())
+  orgId            String? // null for platform (PP) admins
+  name             String
+  email            String    @unique
+  role             RoleKey
+  title            String?
+  npi              String?
+  licenseStates    String[] // states where a provider is licensed
+  credentialStatus CredentialStatus?
+  active           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+
+  organization  Organization? @relation(fields: [orgId], references: [id])
+  memberships   LocationMembership[]
+  patients      Patient[]     @relation("PatientProvider")
+  orders        Order[]       @relation("OrderProvider")
+  completions   EducationCompletion[]
+
+  @@index([orgId])
+  @@index([role])
+}
+
+// Explicit user<->location scoping for RBAC (location managers see a subset).
+model LocationMembership {
+  id         String @id @default(uuid())
+  userId     String
+  locationId String
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, locationId])
+  @@index([locationId])
+}
+
+// Permissions are role-derived in code (src/lib/rbac.ts); this table exists
+// for future per-user permission overrides / grants.
+model PermissionGrant {
+  id         String @id @default(uuid())
+  userId     String
+  permission String
+  granted    Boolean @default(true)
+
+  @@unique([userId, permission])
+}
+
+// ----------------------------------------------------------------------------
+// Patients (PHI)
+// ----------------------------------------------------------------------------
+
+model Patient {
+  id                 String    @id @default(uuid())
+  orgId              String
+  locationId         String
+  firstName          String // PHI
+  lastName           String // PHI
+  dob                DateTime  @db.Date // PHI
+  sex                String    @db.Char(1)
+  email              String // PHI
+  phone              String // PHI
+  state              String    @db.Char(2)
+  programId          String?
+  providerId         String
+  status             PatientStatus @default(onboarding)
+  lastOrderAt        DateTime?
+  nextFollowUpAt     DateTime?
+  preferredPharmacyId String?
+  createdAt          DateTime  @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  location     Location     @relation(fields: [locationId], references: [id])
+  provider     User         @relation("PatientProvider", fields: [providerId], references: [id])
+  program      Program?     @relation(fields: [programId], references: [id])
+  prescriptions Prescription[]
+  orders       Order[]
+
+  @@index([orgId])
+  @@index([locationId])
+  @@index([providerId])
+  @@index([programId])
+  @@index([status])
+}
+
+// ----------------------------------------------------------------------------
+// Pharmacies, credentials, integrations
+// ----------------------------------------------------------------------------
+
+model Pharmacy {
+  id                    String   @id @default(uuid())
+  name                  String
+  type                  PharmacyType
+  pathway               OrderPathway
+  blurb                 String
+  statesServed          String[]
+  productCategories     String[]
+  fulfillmentDaysMin    Int
+  fulfillmentDaysMax    Int
+  shippingOptions       String[]
+  integrationStatus     IntegrationStatus @default(pending)
+  orderingMethod        OrderingMethod
+  supportEmail          String
+  supportPhone          String
+  lastCredentialCheck   DateTime
+  adapterKey            String // maps to a PharmacyAdapter implementation
+
+  credentials      PharmacyCredential[]
+  pharmacyProducts PharmacyProduct[]
+  orders           Order[]
+  integration      Integration?
+
+  @@index([type])
+  @@index([integrationStatus])
+}
+
+model PharmacyCredential {
+  id             String   @id @default(uuid())
+  pharmacyId     String
+  label          String
+  authority      String
+  status         CredentialStatus @default(pending)
+  lastVerifiedAt DateTime
+  documentUrl    String?
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId])
+}
+
+model Integration {
+  id          String  @id @default(uuid())
+  pharmacyId  String  @unique
+  adapterKey  String
+  transport   OrderingMethod
+  status      IntegrationStatus @default(pending)
+  lastSyncAt  DateTime?
+  config      Json?
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+}
+
+// ----------------------------------------------------------------------------
+// Catalog: canonical products normalized across pharmacy-specific SKUs
+// ----------------------------------------------------------------------------
+
+model CanonicalProduct {
+  id                  String   @id @default(uuid())
+  name                String
+  category            String
+  aliases             String[]
+  defaultRoute        String
+  defaultForm         String
+  strengths           String[]
+  regulatoryStatus    RegulatoryStatus @default(available)
+  regulatoryNote      String?
+  requiresPrescription Boolean @default(true)
+  summary             String
+  educationModuleId   String?
+
+  pharmacyProducts PharmacyProduct[]
+  programProducts  ProgramProduct[]
+  prescriptions    Prescription[]
+  orders           Order[]
+
+  @@index([category])
+  @@index([regulatoryStatus])
+}
+
+model PharmacyProduct {
+  id                 String @id @default(uuid())
+  canonicalProductId String
+  pharmacyId         String
+  pharmacyName       String // the pharmacy's own label for this SKU
+  type               PharmacyType
+  pathway            OrderPathway
+  strength           String
+  form               String
+  route              String
+  statesAvailable    String[]
+  inStock            Boolean @default(true)
+
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  pharmacy         Pharmacy         @relation(fields: [pharmacyId], references: [id])
+  prices           Price[]
+  orders           Order[]
+
+  @@index([canonicalProductId])
+  @@index([pharmacyId])
+}
+
+// Pricing is time-versioned so pharmacy pricing feeds can append history.
+model Price {
+  id                String   @id @default(uuid())
+  pharmacyProductId String
+  priceCents        Int
+  shippingCents     Int      @default(0)
+  effectiveFrom     DateTime @default(now())
+  effectiveTo       DateTime?
+  source            String   @default("manual") // "manual" | "feed:<adapter>"
+
+  pharmacyProduct PharmacyProduct @relation(fields: [pharmacyProductId], references: [id])
+
+  @@index([pharmacyProductId])
+}
+
+// ----------------------------------------------------------------------------
+// Programs
+// ----------------------------------------------------------------------------
+
+model Program {
+  id                String   @id @default(uuid())
+  orgId             String
+  name              String
+  category          String
+  description       String
+  color             String
+  status            ProgramStatus @default(draft)
+  monthlyPriceCents Int
+  requiredLabs      String[]
+  followUpCadence   String
+  createdAt         DateTime @default(now())
+
+  organization    Organization     @relation(fields: [orgId], references: [id])
+  programProducts ProgramProduct[]
+  patients        Patient[]
+
+  @@index([orgId])
+}
+
+model ProgramProduct {
+  id                 String @id @default(uuid())
+  programId          String
+  canonicalProductId String
+
+  program          Program          @relation(fields: [programId], references: [id])
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+
+  @@unique([programId, canonicalProductId])
+}
+
+// ----------------------------------------------------------------------------
+// Prescriptions & Orders
+// ----------------------------------------------------------------------------
+
+// A prescription is the clinical intent; an order is its fulfillment.
+model Prescription {
+  id                 String   @id @default(uuid())
+  patientId          String
+  providerId         String
+  canonicalProductId String
+  strength           String
+  form               String
+  route              String
+  directions         String
+  quantity           Int
+  refills            Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  patient          Patient          @relation(fields: [patientId], references: [id])
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  order            Order?
+
+  @@index([patientId])
+}
+
+model Order {
+  id                 String   @id @default(uuid())
+  ref                String   @unique
+  orgId              String
+  locationId         String
+  patientId          String
+  providerId         String
+  pharmacyId         String
+  prescriptionId     String?  @unique
+  canonicalProductId String
+  pharmacyProductId  String
+  pathway            OrderPathway
+  type               PharmacyType
+  strength           String
+  form               String
+  route              String
+  directions         String
+  quantity           Int
+  refills            Int      @default(0)
+  priceCents         Int
+  shippingCents      Int      @default(0)
+  status             OrderStatus @default(draft)
+  isDemo             Boolean  @default(true)
+  vendorOrderId      String?
+  trackingCarrier    String?
+  trackingNumber     String?
+  createdAt          DateTime @default(now())
+
+  organization     Organization     @relation(fields: [orgId], references: [id])
+  location         Location         @relation(fields: [locationId], references: [id])
+  patient          Patient          @relation(fields: [patientId], references: [id])
+  provider         User             @relation("OrderProvider", fields: [providerId], references: [id])
+  pharmacy         Pharmacy         @relation(fields: [pharmacyId], references: [id])
+  prescription     Prescription?    @relation(fields: [prescriptionId], references: [id])
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  pharmacyProduct  PharmacyProduct  @relation(fields: [pharmacyProductId], references: [id])
+  items            OrderItem[]
+  events           OrderEvent[]
+  shipment         Shipment?
+
+  @@index([orgId])
+  @@index([patientId])
+  @@index([pharmacyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          String @id @default(uuid())
+  orderId     String
+  description String
+  quantity    Int
+  priceCents  Int
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id      String      @id @default(uuid())
+  orderId String
+  status  OrderStatus
+  note    String?
+  at      DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+}
+
+model Shipment {
+  id             String   @id @default(uuid())
+  orderId        String   @unique
+  carrier        String
+  trackingNumber String
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+// ----------------------------------------------------------------------------
+// Education
+// ----------------------------------------------------------------------------
+
+model EducationModule {
+  id            String   @id @default(uuid())
+  title         String
+  category      String
+  durationMin   Int
+  description   String
+  version       String
+  lastReviewedAt DateTime
+  reviewer      String
+  audience      String[] // provider | staff | patient
+
+  completions EducationCompletion[]
+}
+
+model EducationCompletion {
+  id                  String   @id @default(uuid())
+  moduleId            String
+  userId              String
+  status              CompletionStatus @default(assigned)
+  completedAt         DateTime?
+  certificateExpiresAt DateTime?
+
+  module EducationModule @relation(fields: [moduleId], references: [id])
+  user   User            @relation(fields: [userId], references: [id])
+
+  @@unique([moduleId, userId])
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Support
+// ----------------------------------------------------------------------------
+
+model SupportTicket {
+  id              String   @id @default(uuid())
+  ref             String   @unique
+  orgId           String
+  subject         String
+  category        TicketCategory
+  priority        TicketPriority @default(normal)
+  status          TicketStatus   @default(open)
+  assignee        String
+  relatedOrderId  String?
+  relatedPatientId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  messages     TicketMessage[]
+
+  @@index([orgId])
+  @@index([status])
+}
+
+model TicketMessage {
+  id       String   @id @default(uuid())
+  ticketId String
+  author   String
+  role     String // clinic | pp
+  body     String
+  at       DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id])
+
+  @@index([ticketId])
+}
+
+// ----------------------------------------------------------------------------
+// Billing
+// ----------------------------------------------------------------------------
+
+model Subscription {
+  id                 String   @id @default(uuid())
+  orgId              String   @unique
+  plan               Plan
+  seats              Int
+  locationsIncluded  Int
+  status             String   @default("active")
+  stripeCustomerId   String? // set once Stripe is connected
+  currentPeriodEnd   DateTime?
+
+  organization Organization @relation(fields: [orgId], references: [id])
+}
+
+model Invoice {
+  id          String   @id @default(uuid())
+  orgId       String
+  number      String   @unique
+  periodStart DateTime
+  periodEnd   DateTime
+  amountCents Int
+  status      InvoiceStatus @default(open)
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+}
+
+// ----------------------------------------------------------------------------
+// Cross-cutting: audit log, notifications
+// ----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  orgId      String?
+  actorId    String? // user id
+  action     String // e.g. "patient.view", "order.create"
+  entityType String
+  entityId   String
+  // PHI-safe: metadata must never contain PHI; store references, not values.
+  metadata   Json?
+  ip         String?
+  at         DateTime @default(now())
+
+  organization Organization? @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([at])
+}
+
+model Notification {
+  id      String   @id @default(uuid())
+  userId  String
+  type    String
+  title   String
+  body    String
+  read    Boolean  @default(false)
+  at      DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum RoleKey {
+  org_owner
+  provider
+  clinic_staff
+  pp_admin
+}
+
+enum Plan {
+  founding
+  growth
+  enterprise
+}
+
+enum PharmacyType {
+  A_503 @map("503A")
+  B_503 @map("503B")
+}
+
+enum OrderPathway {
+  patient_specific
+  clinic_supply
+}
+
+enum IntegrationStatus {
+  connected
+  manual
+  pending
+  unavailable
+}
+
+enum OrderingMethod {
+  API
+  Portal
+  Fax
+  EDI
+}
+
+enum RegulatoryStatus {
+  available
+  restricted
+  not_available_compounded
+  verification_required
+}
+
+enum CredentialStatus {
+  verified
+  pending
+  expired
+}
+
+enum PatientStatus {
+  active
+  onboarding
+  paused
+  inactive
+}
+
+enum ProgramStatus {
+  active
+  draft
+}
+
+enum OrderStatus {
+  draft
+  provider_review
+  submitted
+  accepted
+  processing
+  compounding
+  quality_review
+  shipped
+  delivered
+  exception
+  cancelled
+}
+
+enum CompletionStatus {
+  assigned
+  in_progress
+  completed
+}
+
+enum TicketCategory {
+  order
+  pharmacy
+  fulfillment
+  platform
+  billing
+  program
+  general
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  waiting
+  resolved
+}
+
+enum InvoiceStatus {
+  paid
+  open
+  void
+}
